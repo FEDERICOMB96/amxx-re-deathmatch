@@ -11,12 +11,12 @@
 #pragma semicolon 1
 
 new const g_sPluginName[] = "DEATHMATCH";
-new const g_sPluginVersion[] = "v4";
+new const g_sPluginVersion[] = "v5";
 new const g_sPluginAuthor[] = "FEDERICOMB";
 
 new const g_sGlobalPrefix[] = "^4[DEATHMATCH]^1 ";
 
-const MAX_USERS = 33;
+#define MAX_USERS MAX_CLIENTS+1
 const MAX_CSDM_SPAWNS = 120;
 
 /// Player Vars
@@ -40,15 +40,11 @@ new g_iWeaponData[MAX_USERS][structWeaponData];
 
 /// Global Vars
 new g_iSpawnCount = 0;
-// new g_iSyncHudSpawn = 0;
 new g_iSyncHudDamage = 0;
-new g_iAllowRandomSpawns = 1;
 new g_iGlobalMenuOne;
 new g_iGlobalMenuTwo;
 
-new g_sCurrentMap[32];
-
-new Float:g_fTeams_Time;
+new bool:g_bAllowRandomSpawns = true;
 
 // SPAWNS
 new TeamName:g_iSpawnsTeam[MAX_CSDM_SPAWNS];
@@ -57,26 +53,12 @@ new Float:g_fSpawns[MAX_CSDM_SPAWNS][3];
 new Float:g_fSpawnsAngles[MAX_CSDM_SPAWNS][3];
 
 // Cvars
-new g_pCvar__CSDM_OnlyHead = 0;
-new g_pCvar__CSDM_FreeForAll = 0;
-new g_pCvar__CSDM_Grenades = 0;
-new g_pCvar__CSDM_MedicKit = 0;
-
-new g_pCvar__CSDM_TimeRespawn = 0;
-
 new g_iCSDM_OnlyHead = 0;
-new TeamName:g_iCSDM_FreeForAll = TEAM_UNASSIGNED;
-
-new g_sCSDM_Grenades[3];
-new g_bCSDM_Grenades = 0;
-
+new g_iCSDM_FreeForAll = 0;
 new g_iCSDM_MedicKit = 0;
 
 /// Forward Vars
 new g_Forward_Spawn = 0;
-
-/// Message Vars
-new g_Message_TeamInfo = 0;
 
 enum _:e_StructWeapons
 {
@@ -118,50 +100,11 @@ new const SECONDARY_WEAPONS[][e_StructWeapons] =
 	{WEAPON_FIVESEVEN, 	"weapon_fiveseven", "Five SeveN", 			false}
 };
 
-enum _:structMaps {
-	mapName[64],
-	mapRandomSpawn
-};
-
-new const MAPS_ATTRIB[][structMaps] = {
-	{"unnamed", 		0},
-	{"32_aztecworld", 	0}, // Chico
-	{"cs_assault", 		1}, 
-	{"cs_dust3", 		0}, // Chico
-	{"cs_italy", 		1},
-	{"cs_militia", 		1},
-	{"cs_office", 		1},
-	{"css_cache", 		1},
-	{"css_overpass",	1},
-	{"de_aztec", 		1},
-	{"de_dust", 		1},
-	{"de_dust2", 		1},
-	{"de_forge", 		1},
-	{"de_inferno", 		1},
-	{"de_mirage",		1},
-	{"de_nuke", 		1},
-	{"de_train", 		1},
-	{"de_tuscan", 		1},
-	{"dem_kdust", 		0}, // Chico
-	{"dm_aztec", 		0}, // Chico
-	{"dm_dust", 		0}, // Chico
-	{"dm_x", 			0}, // Chico
-	{"fy_snow_orange", 	0}  // Chico
-};
-
 const BIT_HEGRENADE = 1;
 const BIT_FBGRENADE = 2;
 const BIT_SGGRENADE = 4;
 
 new const CLASSNAME_ENT_MEDKIT[] = "entMedKit";
-
-enum (+= 123491)
-{
-	// PLAYER
-	TASKID_TEAM = 1234555
-};
-
-#define ID_TEAM (taskid - TASKID_TEAM)
 
 #define IsPlayer(%0) 					( 1 <= %0 <= MAX_CLIENTS )
 
@@ -173,33 +116,28 @@ enum (+= 123491)
 #define IsConnected(%0)					GetPlayerBit(g_bConnected, %0)
 #define IsAlive(%0)						GetPlayerBit(g_bAlive, %0)
 
-#define PDATA_SAFE						2
-#define OFFSET_JOINSTATE				121
-#define OFFSET_CSMENUCODE				205
-
-#define KEYSMENU						((1<<0) | (1<<1) | (1<<2) | (1<<3) | (1<<4) | (1<<5) | (1<<6) | (1<<7) | (1<<8) | (1<<9))
-
-new const MAXBPAMMO[] = { -1, 52, -1, 90, 1, 32, 1, 100, 90, 1, 120, 100, 100, 90, 90, 90, 100, 120, 30, 120, 200, 32, 90, 120, 90, 2, 35, 90, 90, -1, 100 };
-new const AMMOTYPE[][] = { "", "357sig", "", "762nato", "", "buckshot", "", "45acp", "556nato", "", "9mm", "57mm", "45acp",
-"556nato", "556nato", "556nato", "45acp", "9mm", "338magnum", "9mm", "556natobox", "buckshot",
-"556nato", "9mm", "762nato", "", "50ae", "556nato", "762nato", "", "57mm" };
-
-new const CS_TEAM_NAMES[][] = { "UNASSIGNED", "TERRORIST", "CT", "SPECTATOR" };
-
-new const OBJECTIVES_ENTITIES[][] = {
+new const OBJECTIVES_ENTITIES[][] =
+{
 	"func_bomb_target", "info_bomb_target",	"info_vip_start", "func_vip_safetyzone", "func_escapezone",
 	"hostage_entity", "monster_scientist", "func_hostage_rescue", "info_hostage_rescue", "env_fog",
 	"env_rain", "env_snow", "item_longjump", "func_vehicle", "game_player_equip",
 	"info_map_parameters", "func_buyzone", "armoury_entity", "game_text"
 };
 
-new const g_sModelsTT[][] = {"arctic", "guerilla", "leet", "terror"};
-new const g_sModelsCT[][] = {"gign", "gsg9", "sas", "urban"};
+new const TXTMSG_BLOCK[][] =
+{
+	"#Game_teammate_attack", "#Game_Commencing", "#Game_will_restart_in", 
+	"#Hostages_Not_Rescued", "#Round_Draw", "#Terrorists_Win", "#CTs_Win"
+};
+
+new const SENDAUDIO_BLOCK[][] =
+{
+	"%!MRAD_ctwin", "%!MRAD_terwin", "%!MRAD_rounddraw", "%!MRAD_FIREINHOLE",
+	"%!MRAD_BOMBPL", "%!MRAD_BOMBDEF", "%!MRAD_rescued"
+};
 
 new const g_sModel_MedicKit[] = "models/w_medkit.mdl";
-
 new const g_sSound_MedicKit[] = "items/smallmedkit1.wav";
-new const g_sSound_WinNoOne[] = "ambience/3dmstart.wav";
 
 public plugin_precache()
 {
@@ -209,45 +147,10 @@ public plugin_precache()
 	set_pcvar_string(create_cvar("csdm_version", sBuffer, FCVAR_SERVER | FCVAR_SPONLY), sBuffer);
 	set_pcvar_string(create_cvar("csdm_active", "1", FCVAR_SERVER | FCVAR_SPONLY), "1");
 
-	g_pCvar__CSDM_OnlyHead = create_cvar("csdm_only_head", "0", .has_min = true, .min_val = 0.0, .has_max = true, .max_val = 1.0);
-	g_pCvar__CSDM_FreeForAll = create_cvar("csdm_ffa", "0");
-	g_pCvar__CSDM_Grenades = create_cvar("csdm_grenades", "h");
-	g_pCvar__CSDM_MedicKit = create_cvar("csdm_drop_medic", "0", .has_min = true, .min_val = 0.0, .has_max = true, .max_val = 1.0);
-
-	g_pCvar__CSDM_TimeRespawn = get_cvar_pointer("mp_forcerespawn");
-
 	g_Forward_Spawn = register_forward(FM_Spawn, "OnFw__Spawn");
 
-	new i;
-	for( i = 0; i < sizeof(g_sModelsTT); ++i )
-	{
-		formatex(sBuffer, charsmax(sBuffer), "models/player/%s/%s.mdl", g_sModelsTT[i], g_sModelsTT[i]);
-		precache_model(sBuffer);
-	}
-
-	for( i = 0; i < sizeof(g_sModelsCT); ++i )
-	{
-		formatex(sBuffer, charsmax(sBuffer), "models/player/%s/%s.mdl", g_sModelsCT[i], g_sModelsCT[i]);
-		precache_model(sBuffer);
-	}
-
 	precache_model(g_sModel_MedicKit);
-
 	precache_sound(g_sSound_MedicKit);
-	precache_sound(g_sSound_WinNoOne);
-
-	get_mapname(g_sCurrentMap, charsmax(g_sCurrentMap));
-	strtolower(g_sCurrentMap);
-
-	for( i = 0; i < sizeof(MAPS_ATTRIB); ++i )
-	{
-		if( equali(g_sCurrentMap, MAPS_ATTRIB[i][mapName]) )
-		{
-			g_iAllowRandomSpawns = MAPS_ATTRIB[i][mapRandomSpawn];
-
-			break;
-		}
-	}
 }
 
 public plugin_init()
@@ -255,8 +158,11 @@ public plugin_init()
 	register_plugin(g_sPluginName, g_sPluginVersion, g_sPluginAuthor);
 
 	loadSpawns();
-	loadCvars();
 	loadMenus();
+
+	bind_pcvar_num(create_cvar("csdm_only_head", "0"), g_iCSDM_OnlyHead);
+	bind_pcvar_num(create_cvar("csdm_drop_medic", "0"), g_iCSDM_MedicKit);
+	bind_pcvar_num(get_cvar_pointer("mp_freeforall"), g_iCSDM_FreeForAll);
 
 	register_concmd("csdm_reload_spawns", "ConsoleCommand__Spawns");
 
@@ -266,7 +172,6 @@ public plugin_init()
 	RegisterHamPlayer(Ham_Spawn, "OnHam__PlayerSpawn_Post", 1);
 	RegisterHamPlayer(Ham_TraceAttack, "OnHam__PlayerTraceAttack");
 	RegisterHamPlayer(Ham_Killed, "OnHam__PlayerKilled");
-	RegisterHamPlayer(Ham_Killed, "OnHam__PlayerKilled_Post", 1);
 
 	unregister_forward(FM_Spawn, g_Forward_Spawn);
 
@@ -278,23 +183,25 @@ public plugin_init()
 		register_think(CLASSNAME_ENT_MEDKIT, "think__MedicKit");
 	}
 
-	g_Message_TeamInfo = get_user_msgid("TeamInfo");
-
 	register_message(get_user_msgid("RoundTime"), "message__RoundTime");
-	register_message(get_user_msgid("NVGToggle"), "message__NVGToggle");
 	register_message(get_user_msgid("TextMsg"), "message__TextMsg");
 	register_message(get_user_msgid("SendAudio"), "message__SendAudio");
 
 	set_msg_block(get_user_msgid("Radar"), BLOCK_SET);
 
-	// g_iSyncHudSpawn = CreateHudSyncObj();
 	g_iSyncHudDamage = CreateHudSyncObj();
 }
 
 public OnConfigsExecuted()
 {
-	server_cmd("exec addons/amxmodx/configs/re_csdm_amxx.cfg");
+	server_cmd("exec dm_game.cfg");
 	server_cmd("sv_restart 1");
+}
+
+public plugin_end()
+{
+	if(g_iGlobalMenuOne) menu_destroy(g_iGlobalMenuOne);
+	if(g_iGlobalMenuTwo) menu_destroy(g_iGlobalMenuTwo);
 }
 
 loadSpawns()
@@ -336,44 +243,14 @@ loadSpawns()
 	return g_iSpawnCount;
 }
 
-loadCvars()
-{
-	g_iCSDM_OnlyHead = get_pcvar_num(g_pCvar__CSDM_OnlyHead);
-	g_iCSDM_FreeForAll = TeamName:clamp(get_pcvar_num(g_pCvar__CSDM_FreeForAll), _:TEAM_UNASSIGNED, _:TEAM_CT);
-
-	get_pcvar_string(g_pCvar__CSDM_Grenades, g_sCSDM_Grenades, charsmax(g_sCSDM_Grenades));
-	{
-		if(containi(g_sCSDM_Grenades, "h") != -1)
-		{
-			g_bCSDM_Grenades |= BIT_HEGRENADE;
-		}
-
-		if(containi(g_sCSDM_Grenades, "f") != -1)
-		{
-			g_bCSDM_Grenades |= BIT_FBGRENADE;
-		}
-
-		if(containi(g_sCSDM_Grenades, "s") != -1)
-		{
-			g_bCSDM_Grenades |= BIT_SGGRENADE;
-		}
-	}
-
-	g_iCSDM_MedicKit = get_pcvar_num(g_pCvar__CSDM_MedicKit);
-}
-
 loadMenus()
 {
-	new i;
-
 	// Primary Weapons
 	{
 		g_iGlobalMenuOne = menu_create(fmt("\y%s :\w Armas primarias\R\y", g_sPluginName), "menu__PrimaryWeapons");
 
-		for( i = 0; i < sizeof(PRIMARY_WEAPONS); ++i )
-		{
+		for(new i = 0; i < sizeof(PRIMARY_WEAPONS); ++i)
 			menu_additem(g_iGlobalMenuOne, PRIMARY_WEAPONS[i][weaponNames]);
-		}
 
 		menu_setprop(g_iGlobalMenuOne, MPROP_NEXTNAME, "Página siguiente");
 		menu_setprop(g_iGlobalMenuOne, MPROP_BACKNAME, "Página anterior");
@@ -384,10 +261,8 @@ loadMenus()
 	{
 		g_iGlobalMenuTwo = menu_create(fmt("\y%s :\w Armas secundarias\R\y", g_sPluginName), "menu__SecondaryWeapons");
 
-		for( i = 0; i < sizeof(SECONDARY_WEAPONS); ++i )
-		{
+		for(new i = 0; i < sizeof(SECONDARY_WEAPONS); ++i)
 			menu_additem(g_iGlobalMenuTwo, SECONDARY_WEAPONS[i][weaponNames]);
-		}
 
 		menu_setprop(g_iGlobalMenuTwo, MPROP_NEXTNAME, "Página siguiente");
 		menu_setprop(g_iGlobalMenuTwo, MPROP_BACKNAME, "Página anterior");
@@ -411,8 +286,6 @@ public client_putinserver(id)
 
 public client_disconnected(id)
 {
-	remove_task(id + TASKID_TEAM);
-
 	ClearPlayerBit(g_bConnected, id);
 	ClearPlayerBit(g_bAlive, id);
 }
@@ -449,37 +322,15 @@ public ClientCommand__Weapons(const id)
 /*************************************************************************************/
 public OnHam__PlayerSpawn_Post(const id)
 {
-	if( !is_user_alive(id) )
-	{
+	if(!is_user_alive(id))
 		return;
-	}
 	
 	SetPlayerBit(g_bAlive, id);
 
-	if( g_iCSDM_FreeForAll )
-	{
-		if( GetUserTeam(id) != g_iCSDM_FreeForAll )
-		{
-			remove_task(id + TASKID_TEAM);
-			
-			SetUserTeam(id, g_iCSDM_FreeForAll);
-			userTeamUpdate(id);
-		}
-	}
+	if(g_iCSDM_FreeForAll && GetUserTeam(id) != TEAM_TERRORIST)
+		rg_set_user_team(id, TEAM_TERRORIST);
 
 	randomSpawn(id);
-
-	set_rendering(id);
-
-	set_user_health(id, 100);
-	set_user_armor(id, 100);
-
-	cs_set_user_armor(id, 100, CS_ARMOR_VESTHELM);
-
-	if( !g_iDontShowTheMenuAgain[id] )
-	{
-		OnTaskRemoveWeapons(id);
-	}
 
 	OnTaskShowMenuWeapons(id);
 
@@ -525,7 +376,7 @@ public OnHam__PlayerKilled( const victim, const killer, const shouldgib )
 
 		if(user_has_weapon(victim, _:iWid) && is_valid_ent(g_iPrimaryWeaponsEnt[victim]))
 		{
-			switch( iWid )
+			switch(iWid)
 			{
 				case CSW_M4A1: g_iWeaponData[victim][weaponM4A1] = cs_get_weapon_silen(g_iPrimaryWeaponsEnt[victim]);
 				case CSW_FAMAS: g_iWeaponData[victim][weaponFAMAS] = cs_get_weapon_burst(g_iPrimaryWeaponsEnt[victim]);
@@ -539,7 +390,7 @@ public OnHam__PlayerKilled( const victim, const killer, const shouldgib )
 
 		if(user_has_weapon(victim, _:iWid) && is_valid_ent(g_iSecondaryWeaponsEnt[victim]))
 		{
-			switch( iWid )
+			switch(iWid)
 			{
 				case CSW_USP: g_iWeaponData[victim][weaponUSP] = cs_get_weapon_silen(g_iSecondaryWeaponsEnt[victim]);
 				case CSW_GLOCK18: g_iWeaponData[victim][weaponGLOCK] = cs_get_weapon_burst(g_iSecondaryWeaponsEnt[victim]);
@@ -589,20 +440,6 @@ public OnHam__PlayerKilled( const victim, const killer, const shouldgib )
 	return HAM_IGNORED;
 }
 
-public OnHam__PlayerKilled_Post( const victim, const killer, const shouldgib )
-{
-	set_task(get_pcvar_float(g_pCvar__CSDM_TimeRespawn) + 0.5, "OnTaskRespawnPlayerCheck", victim);
-}
-
-public OnTaskRemoveWeapons(const id)
-{
-	if(!GetPlayerBit(g_bAlive, id))
-		return;
-
-	strip_user_weapons(id);
-	rg_give_item(id, "weapon_knife");
-}
-
 public OnTaskShowMenuWeapons(const id)
 {
 	if(!GetPlayerBit(g_bAlive, id))
@@ -610,11 +447,8 @@ public OnTaskShowMenuWeapons(const id)
 
 	if(g_iDontShowTheMenuAgain[id])
 	{
-		strip_user_weapons(id);
-		
 		giveWeapons(id, 1);
 		giveWeapons(id, 2);
-		giveWeapons(id, 3);
 
 		rg_give_item(id, "weapon_knife");
 
@@ -651,7 +485,6 @@ public menu__Equip(const id, const menuid, const itemid)
 		{
 			giveWeapons(id, 1);
 			giveWeapons(id, 2);
-			giveWeapons(id, 3);
 		}
 
 		case 2:
@@ -660,7 +493,6 @@ public menu__Equip(const id, const menuid, const itemid)
 
 			giveWeapons(id, 1);
 			giveWeapons(id, 2);
-			giveWeapons(id, 3);
 
 			client_print_color(id, print_team_default, "%sEscribe^4 guns^1 para activar nuevamente el menú de armamento", g_sGlobalPrefix);
 		}
@@ -688,7 +520,6 @@ public menu__PrimaryWeapons(const id, const menuid, const itemid)
 
 	g_iPrimaryWeapons[id] = itemid;
 	giveWeapons(id, 1);
-	giveWeapons(id, 3);
 
 	return PLUGIN_HANDLED;
 }
@@ -714,92 +545,42 @@ public giveWeapons(const id, const weapon)
 	{
 		case 1:
 		{
-			if( g_iPrimaryWeapons[id] < 0 || g_iPrimaryWeapons[id] >= sizeof(PRIMARY_WEAPONS) )
-			{
-				g_iPrimaryWeapons[id] = 0;
-			}
-
 			new WeaponIdType:iWid = PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponId];
 
 			g_iPrimaryWeaponsEnt[id] = rg_give_item(id, PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponEnt]);
-			ExecuteHamB(Ham_GiveAmmo, id, MAXBPAMMO[_:iWid], AMMOTYPE[_:iWid], MAXBPAMMO[_:iWid]);
 
-			if( iWid == WEAPON_M4A1 || iWid == WEAPON_FAMAS )
+			if((iWid == WEAPON_M4A1 || iWid == WEAPON_FAMAS) && is_valid_ent(g_iPrimaryWeaponsEnt[id]))
 			{
-				if( is_valid_ent(g_iPrimaryWeaponsEnt[id]) )
+				switch(iWid)
 				{
-					switch( iWid )
+					case WEAPON_M4A1:
 					{
-						case WEAPON_M4A1:
-						{
-							cs_set_weapon_silen(g_iPrimaryWeaponsEnt[id], g_iWeaponData[id][weaponM4A1], 0);
+						cs_set_weapon_silen(g_iPrimaryWeaponsEnt[id], g_iWeaponData[id][weaponM4A1], 0);
 
-							if( g_iWeaponData[id][weaponM4A1] )
-							{
-								setAnimation(id, 5);
-							}
-						}
-						case WEAPON_FAMAS: cs_set_weapon_burst(g_iPrimaryWeaponsEnt[id], g_iWeaponData[id][weaponFAMAS]);
+						if(g_iWeaponData[id][weaponM4A1])
+							setAnimation(id, 5);
 					}
+					case WEAPON_FAMAS: cs_set_weapon_burst(g_iPrimaryWeaponsEnt[id], g_iWeaponData[id][weaponFAMAS]);
 				}
 			}
 		}
 
 		case 2:
 		{
-			if( g_iSecondaryWeapons[id] < 0 || g_iSecondaryWeapons[id] >= sizeof(SECONDARY_WEAPONS) )
-			{
-				g_iSecondaryWeapons[id] = 0;
-			}
-
 			new WeaponIdType:iWid = SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponId];
 
 			g_iSecondaryWeaponsEnt[id] = rg_give_item(id, SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponEnt]);
-			ExecuteHamB(Ham_GiveAmmo, id, MAXBPAMMO[_:iWid], AMMOTYPE[_:iWid], MAXBPAMMO[_:iWid]);
 
-			if( iWid == WEAPON_USP || iWid == WEAPON_GLOCK18 )
+			if((iWid == WEAPON_USP || iWid == WEAPON_GLOCK18) && is_valid_ent(g_iSecondaryWeaponsEnt[id]))
 			{
-				if( is_valid_ent(g_iSecondaryWeaponsEnt[id]) )
+				switch(iWid)
 				{
-					switch( iWid )
-					{
-						case CSW_USP: cs_set_weapon_silen(g_iSecondaryWeaponsEnt[id], g_iWeaponData[id][weaponUSP], 0);
-						case CSW_GLOCK18: cs_set_weapon_burst(g_iSecondaryWeaponsEnt[id], g_iWeaponData[id][weaponGLOCK]);
-					}
+					case CSW_USP: cs_set_weapon_silen(g_iSecondaryWeaponsEnt[id], g_iWeaponData[id][weaponUSP], 0);
+					case CSW_GLOCK18: cs_set_weapon_burst(g_iSecondaryWeaponsEnt[id], g_iWeaponData[id][weaponGLOCK]);
 				}
 			}
 		}
-
-		case 3:
-		{
-			if(g_bCSDM_Grenades & BIT_HEGRENADE)
-				rg_give_item(id, "weapon_hegrenade");
-
-			if(g_bCSDM_Grenades & BIT_FBGRENADE)
-				rg_give_item(id, "weapon_flashbang");
-
-			if(g_bCSDM_Grenades & BIT_SGGRENADE)
-				rg_give_item(id, "weapon_smokegrenade");
-		}
 	}
-}
-
-public OnTaskRespawnPlayerCheck( const id )
-{
-	if( !GetPlayerBit(g_bConnected, id) || GetPlayerBit(g_bAlive, id) )
-	{
-		return;
-	}
-
-	static TeamName:iTeam;
-	iTeam = GetUserTeam(id);
-
-	if( iTeam != TEAM_UNASSIGNED && iTeam != TEAM_SPECTATOR )
-	{
-		rg_round_respawn(id);
-	}
-
-	set_task(get_pcvar_float(g_pCvar__CSDM_TimeRespawn), "OnTaskRespawnPlayerCheck", id);
 }
 
 /*************************************************************************************/
@@ -893,25 +674,15 @@ public message__RoundTime(const msgId, const destId, const id)
 	set_msg_arg_int(1, ARG_SHORT, get_timeleft());
 }
 
-public message__NVGToggle(const msgId, const destId, const id)
-{
-	return PLUGIN_HANDLED;
-}
-
 public message__TextMsg(const msgId, const destId, const id)
 {
 	static szMsg[22];
 	get_msg_arg_string(2, szMsg, charsmax(szMsg));
-	
-	if(equal(szMsg, "#Game_teammate_attack")
-	|| equal(szMsg, "#Game_Commencing")
-	|| equal(szMsg, "#Game_will_restart_in")
-	|| equal(szMsg, "#Hostages_Not_Rescued")
-	|| equal(szMsg, "#Round_Draw")
-	|| equal(szMsg, "#Terrorists_Win")
-	|| equal(szMsg, "#CTs_Win"))
+
+	for(new i = 0; i < sizeof(TXTMSG_BLOCK); ++i)
 	{
-		return PLUGIN_HANDLED;
+		if(equal(szMsg, TXTMSG_BLOCK[i]))
+			return PLUGIN_HANDLED;
 	}
 
 	// #Fire_in_the_hole
@@ -938,15 +709,10 @@ public message__SendAudio(const msgId, const destId, const id)
 	static szAudio[19];
 	get_msg_arg_string(2, szAudio, charsmax(szAudio));
 
-	if(equal(szAudio, "%!MRAD_ctwin")
-	|| equal(szAudio, "%!MRAD_terwin")
-	|| equal(szAudio, "%!MRAD_rounddraw")
-	|| equal(szAudio, "%!MRAD_FIREINHOLE")
-	|| equal(szAudio, "%!MRAD_BOMBPL")
-	|| equal(szAudio, "%!MRAD_BOMBDEF")
-	|| equal(szAudio, "%!MRAD_rescued"))
+	for(new i = 0; i < sizeof(SENDAUDIO_BLOCK); ++i)
 	{
-		return PLUGIN_HANDLED;
+		if(equal(szAudio, SENDAUDIO_BLOCK[i]))
+			return PLUGIN_HANDLED;
 	}
 
 	return PLUGIN_CONTINUE;
@@ -997,7 +763,7 @@ public randomSpawn(const id)
 
 		++iSpawnPass;
 
-		if(!g_iCSDM_FreeForAll && !g_iAllowRandomSpawns && iTeam != g_iSpawnsTeam[iSpawnId]) {
+		if(!g_iCSDM_FreeForAll && !g_bAllowRandomSpawns && iTeam != g_iSpawnsTeam[iSpawnId]) {
 			continue;
 		}
 
@@ -1071,41 +837,7 @@ public isUserStuck(const id) {
 
 public TeamName:GetUserTeam(const id)
 {
-	return get_member(id, m_iTeam);
-}
-
-public SetUserTeam(const id, const TeamName:team)
-{
-	set_member(id, m_iTeam, team);
-}
-
-public userTeamUpdate(const id) {
-	static Float:fCurrentTime;
-	fCurrentTime = get_gametime();
-	
-	if(fCurrentTime - g_fTeams_Time >= 0.1) {
-		set_task(0.1, "setUserTeamMsg", id + TASKID_TEAM);
-		g_fTeams_Time = fCurrentTime + 0.1;
-	} else {
-		set_task((g_fTeams_Time + 0.1) - fCurrentTime, "setUserTeamMsg", id + TASKID_TEAM);
-		g_fTeams_Time = g_fTeams_Time + 0.1;
-	}
-}
-
-public setUserTeamMsg(const taskid)
-{
-	emessage_begin(MSG_ALL, g_Message_TeamInfo);
-	ewrite_byte(ID_TEAM);
-	ewrite_string(CS_TEAM_NAMES[_:g_iCSDM_FreeForAll]);
-	emessage_end();
-}
-
-public getUserModel(const id, model[], const len) {
-	get_user_info(id, "model", model, len);
-}
-
-public setUserModel(const id, const model[]) {
-	set_user_info(id, "model", model);
+	return TeamName:get_member(id, m_iTeam);
 }
 
 setAnimation(const id, const animation)
