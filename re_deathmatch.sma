@@ -12,7 +12,7 @@
 
 new const g_sPluginName[] = "DEATHMATCH";
 new const g_sPluginVersion[] = "v2021.08.16";
-new const g_sPluginAuthor[] = "AMXX-ES Dev Team";
+new const g_sPluginAuthor[] = "FEDERICOMB";
 
 new const g_sGlobalPrefix[] = "^4[DEATHMATCH]^1 ";
 
@@ -31,7 +31,6 @@ new g_iSecondaryWeapons[MAX_USERS];
 new g_iSecondaryWeaponsEnt[MAX_USERS];
 new g_iDontShowTheMenuAgain[MAX_USERS];
 new WeaponIdType:g_iCurrentWeapon[MAX_USERS];
-new g_iFixChooseWeapon[MAX_USERS];
 new g_iSysTimePlayer[MAX_USERS];
 
 enum _:structWeaponData {
@@ -332,8 +331,6 @@ public plugin_init()
 		set_msg_block(get_user_msgid("Radar"), BLOCK_SET);
 	}
 
-	register_menu("MenuEquip", KEYSMENU, "menu__Equip");
-
 	register_menucmd(register_menuid("#Buy", 1), 511, "menu__CSBuy");
 	register_menucmd(register_menuid("BuyPistol", 1), 511, "menu__CSBuy");
 	register_menucmd(register_menuid("BuyShotgun", 1), 511, "menu__CSBuy");
@@ -522,13 +519,12 @@ public client_putinserver(id)
 	ClearPlayerBit(g_bAlive, id);
 	g_iPlayerModel[id] = g_iSetNextModel;
 	g_iMenuInfo[id] = 0;
-	g_iPrimaryWeapons[id] = 0;
+	g_iPrimaryWeapons[id] = random(2);
 	g_iPrimaryWeaponsEnt[id] = 0;
-	g_iSecondaryWeapons[id] = 0;
+	g_iSecondaryWeapons[id] = random(2);
 	g_iSecondaryWeaponsEnt[id] = 0;
 	g_iDontShowTheMenuAgain[id] = 0;
 	g_iCurrentWeapon[id] = WEAPON_NONE;
-	g_iFixChooseWeapon[id] = 0;
 	g_iSysTimePlayer[id] = get_systime();
 
 	for( i = 0; i < structWeaponData; ++i )
@@ -896,7 +892,7 @@ public OnTaskShowMenuWeapons( const id )
 		return;
 	}
 
-	if( g_iDontShowTheMenuAgain[id] && g_iFixChooseWeapon[id] )
+	if( g_iDontShowTheMenuAgain[id] )
 	{
 		strip_user_weapons(id);
 		
@@ -909,23 +905,31 @@ public OnTaskShowMenuWeapons( const id )
 		return;
 	}
 
-	show_menu(
-		id,
-		g_iFixChooseWeapon[id] ? (MENU_KEY_1 | MENU_KEY_2 | MENU_KEY_3) : (MENU_KEY_1),
-		fmt("\y%s : Equipamiento^n\rby\y %s^n^n\r1.\w Armas Nuevas^n%s", g_sPluginName, g_sPluginAuthor, g_iFixChooseWeapon[id] ? "\r2.\w Selección Anterior^n\r3.\w 2 + No mostrar más el Menú" : "\d2. Selección Anterior^n3. 2 + No mostrar más el Menú"),
-		-1,
-		"MenuEquip"
-	);
+	new iMenuId = menu_create(fmt("\y%s : Equipamiento", g_sPluginName, g_sPluginAuthor), "menu__Equip");
+
+	menu_additem(iMenuId, "Armas Nuevas");
+	menu_additem(iMenuId, "Selección Anterior");
+	menu_additem(iMenuId, "2 + No mostrar más el Menú");
+
+	menu_addblank(iMenuId);
+	menu_addtext(iMenuId, fmt("\wArma primaria\r:\y %s", PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponNames]));
+	menu_addtext(iMenuId, fmt("\wArma secundaria\r:\y %s", SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponNames]));
+
+	menu_setprop(iMenuId, MPROP_EXIT, MEXIT_NEVER);
+
+	menu_display(id, iMenuId);
 }
 
-public menu__Equip( const id, const key )
+public menu__Equip( const id, const menuid, const item )
 {
+	menu_destroy(menuid);
+
 	if( !GetPlayerBit(g_bAlive, id) )
 	{
 		return PLUGIN_HANDLED;
 	}
 
-	switch( key )
+	switch( item )
 	{
 		case 0: showMenu__Weapons(id, 2);
 
@@ -1000,8 +1004,6 @@ public giveWeapons( const id, const weapon )
 		return;
 	}
 
-	new WeaponIdType:iWid;
-
 	switch( weapon )
 	{
 		case 1:
@@ -1011,7 +1013,7 @@ public giveWeapons( const id, const weapon )
 				g_iPrimaryWeapons[id] = 0;
 			}
 
-			iWid = PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponId];
+			new WeaponIdType:iWid = PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponId];
 
 			g_iPrimaryWeaponsEnt[id] = rg_give_item(id, PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponEnt]);
 			ExecuteHamB(Ham_GiveAmmo, id, MAXBPAMMO[_:iWid], AMMOTYPE[_:iWid], MAXBPAMMO[_:iWid]);
@@ -1049,7 +1051,7 @@ public giveWeapons( const id, const weapon )
 				g_iSecondaryWeapons[id] = 0;
 			}
 
-			iWid = SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponId];
+			new WeaponIdType:iWid = SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponId];
 
 			g_iSecondaryWeaponsEnt[id] = rg_give_item(id, SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponEnt]);
 			ExecuteHamB(Ham_GiveAmmo, id, MAXBPAMMO[_:iWid], AMMOTYPE[_:iWid], MAXBPAMMO[_:iWid]);
@@ -1083,8 +1085,6 @@ public giveWeapons( const id, const weapon )
 			{
 				rg_give_item(id, "weapon_smokegrenade");
 			}
-
-			g_iFixChooseWeapon[id] = 1;
 		}
 	}
 }
