@@ -5,17 +5,17 @@
 #include <fakemeta>
 #include <xs>
 
-#pragma semicolon 1
+/* ===========================================================================
+* 				[ Initiation & Global stuff ]
+* ============================================================================ */
 
-new const g_sPluginName[] = "DEATHMATCH";
-new const g_sPluginVersion[] = "v7";
-new const g_sPluginAuthor[] = "FEDERICOMB";
+new const g_szPluginName[]     = "DEATHMATCH";
+new const g_szPluginVersion[]  = "v8";
+new const g_szPluginAuthor[]   = "FEDERICOMB";
+new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1 ";
 
-new const g_sGlobalPrefix[] = "^4[DEATHMATCH]^1 ";
+#define MAX_USERS              MAX_CLIENTS+1
 
-#define MAX_USERS MAX_CLIENTS+1
-
-/// Player Vars
 new g_bConnected;
 new g_bAlive;
 
@@ -26,7 +26,8 @@ new g_iSecondaryWeapons[MAX_USERS];
 new g_iSecondaryWeaponsEnt[MAX_USERS];
 new g_iDontShowTheMenuAgain[MAX_USERS];
 
-enum _:structWeaponData {
+enum _:structWeaponData
+{
 	weaponM4A1 = 0,
 	weaponFAMAS,
 	weaponUSP,
@@ -34,14 +35,12 @@ enum _:structWeaponData {
 };
 new g_iWeaponData[MAX_USERS][structWeaponData];
 
-/// Global Vars
 new g_iSyncHudDamage;
 new g_iGlobalMenuOne;
 new g_iGlobalMenuTwo;
 
 new bool:g_bAllowRandomSpawns = true;
 
-// SPAWNS
 enum _:ArraySpawns_e
 {
 	TeamName:SpawnTeam,
@@ -50,13 +49,11 @@ enum _:ArraySpawns_e
 };
 new Array:g_aSpawns;
 
-// Cvars
 new g_iCSDM_OnlyHead;
 new g_iCSDM_MedicKit;
 new g_iCSDM_FreeForAll;
 new Float:g_flCSDM_ItemStaytime;
 
-/// Forward Vars
 new g_Forward_Spawn;
 
 enum _:e_StructWeapons
@@ -69,51 +66,47 @@ enum _:e_StructWeapons
 
 new const PRIMARY_WEAPONS[][e_StructWeapons] =
 {
-	{WEAPON_M4A1, 		"weapon_m4a1", 		"M4A1", 				true},
-	{WEAPON_AK47, 		"weapon_ak47", 		"AK-47", 				false},
-	{WEAPON_AUG, 		"weapon_aug", 		"AUG", 					false},
-	{WEAPON_SG552, 		"weapon_sg552", 	"SG-552", 				false},
-	{WEAPON_GALIL, 		"weapon_galil", 	"Galil", 				false},
-	{WEAPON_FAMAS, 		"weapon_famas", 	"Famas", 				true},
-	{WEAPON_SCOUT, 		"weapon_scout", 	"Scout", 				false},
-	{WEAPON_AWP, 		"weapon_awp", 		"AWP", 					false},
-	{WEAPON_SG550, 		"weapon_sg550", 	"SG-550", 				false},
-	{WEAPON_M249, 		"weapon_m249", 		"M249",					false},
-	{WEAPON_G3SG1, 		"weapon_g3sg1", 	"G3-SG1", 				false},
-	{WEAPON_UMP45, 		"weapon_ump45", 	"UMP 45", 				false},
-	{WEAPON_MP5N, 		"weapon_mp5navy", 	"MP5 Navy", 			false},
-	{WEAPON_M3, 		"weapon_m3", 		"M3",					false},
-	{WEAPON_XM1014, 	"weapon_xm1014", 	"XM1014", 				false},
-	{WEAPON_TMP, 		"weapon_tmp", 		"TMP", 					false},
-	{WEAPON_MAC10, 		"weapon_mac10", 	"Mac", 					false},
-	{WEAPON_P90, 		"weapon_p90", 		"P90", 					false}
+	{WEAPON_M4A1,       "weapon_m4a1",      "M4A1",                 true},
+	{WEAPON_AK47,       "weapon_ak47",      "AK-47",                false},
+	{WEAPON_AUG,        "weapon_aug",       "AUG",                  false},
+	{WEAPON_SG552,      "weapon_sg552",     "SG-552",               false},
+	{WEAPON_GALIL,      "weapon_galil",     "Galil",                false},
+	{WEAPON_FAMAS,      "weapon_famas",     "Famas",                true},
+	{WEAPON_SCOUT,      "weapon_scout",     "Scout",                false},
+	{WEAPON_AWP,        "weapon_awp",       "AWP",                  false},
+	{WEAPON_SG550,      "weapon_sg550",     "SG-550",               false},
+	{WEAPON_M249,       "weapon_m249",      "M249",                 false},
+	{WEAPON_G3SG1,      "weapon_g3sg1",     "G3-SG1",               false},
+	{WEAPON_UMP45,      "weapon_ump45",     "UMP 45",               false},
+	{WEAPON_MP5N,       "weapon_mp5navy",   "MP5 Navy",             false},
+	{WEAPON_M3,         "weapon_m3",        "M3",                   false},
+	{WEAPON_XM1014,     "weapon_xm1014",    "XM1014",               false},
+	{WEAPON_TMP,        "weapon_tmp",       "TMP",                  false},
+	{WEAPON_MAC10,      "weapon_mac10",     "Mac",                  false},
+	{WEAPON_P90,        "weapon_p90",       "P90",                  false}
 };
 
 new const SECONDARY_WEAPONS[][e_StructWeapons] =
 {
-	{WEAPON_USP, 		"weapon_usp", 		"USP", 					true},
-	{WEAPON_GLOCK18, 	"weapon_glock18", 	"Glock", 				true},
-	{WEAPON_DEAGLE, 	"weapon_deagle", 	"Deagle", 				false},
-	{WEAPON_P228, 		"weapon_p228", 		"P228", 				false},
-	{WEAPON_ELITE, 		"weapon_elite", 	"Elite", 				false},
-	{WEAPON_FIVESEVEN, 	"weapon_fiveseven", "Five SeveN", 			false}
+	{WEAPON_USP,        "weapon_usp",       "USP",                  true},
+	{WEAPON_GLOCK18,    "weapon_glock18",   "Glock",                true},
+	{WEAPON_DEAGLE,     "weapon_deagle",    "Deagle",               false},
+	{WEAPON_P228,       "weapon_p228",      "P228",                 false},
+	{WEAPON_ELITE,      "weapon_elite",     "Elite",                false},
+	{WEAPON_FIVESEVEN,  "weapon_fiveseven", "Five SeveN",           false}
 };
 
-const BIT_HEGRENADE = 1;
-const BIT_FBGRENADE = 2;
-const BIT_SGGRENADE = 4;
+new const CLASSNAME_ENT_MEDKIT[]        = "entMedKit";
 
-new const CLASSNAME_ENT_MEDKIT[] = "entMedKit";
+#define IsPlayer(%0)                    ( 1 <= %0 <= MAX_CLIENTS )
 
-#define IsPlayer(%0) 					( 1 <= %0 <= MAX_CLIENTS )
+#define GetPlayerBit(%0,%1)             ( IsPlayer(%1) && ( %0 & ( 1 << ( %1 & 31 ) ) ) )
+#define SetPlayerBit(%0,%1)             ( IsPlayer(%1) && ( %0 |= ( 1 << ( %1 & 31 ) ) ) )
+#define ClearPlayerBit(%0,%1)           ( IsPlayer(%1) && ( %0 &= ~( 1 << ( %1 & 31 ) ) ) )
+#define SwitchPlayerBit(%0,%1)          ( IsPlayer(%1) && ( %0 ^= ( 1 << ( %1 & 31 ) ) ) )
 
-#define GetPlayerBit(%0,%1) 			( IsPlayer(%1) && ( %0 & ( 1 << ( %1 & 31 ) ) ) )
-#define SetPlayerBit(%0,%1) 			( IsPlayer(%1) && ( %0 |= ( 1 << ( %1 & 31 ) ) ) )
-#define ClearPlayerBit(%0,%1) 			( IsPlayer(%1) && ( %0 &= ~( 1 << ( %1 & 31 ) ) ) )
-#define SwitchPlayerBit(%0,%1) 			( IsPlayer(%1) && ( %0 ^= ( 1 << ( %1 & 31 ) ) ) )
-
-#define IsConnected(%0)					GetPlayerBit(g_bConnected, %0)
-#define IsAlive(%0)						GetPlayerBit(g_bAlive, %0)
+#define IsConnected(%0)                 GetPlayerBit(g_bConnected, %0)
+#define IsAlive(%0)                     GetPlayerBit(g_bAlive, %0)
 
 new const OBJECTIVES_ENTITIES[][] =
 {
@@ -138,10 +131,14 @@ new const SENDAUDIO_BLOCK[][] =
 new const g_sModel_MedicKit[] = "models/w_medkit.mdl";
 new const g_sSound_MedicKit[] = "items/smallmedkit1.wav";
 
+/* =================================================================================
+* 				[ Plugin events ]
+* ================================================================================= */
+
 public plugin_precache()
 {
 	new sBuffer[256];
-	formatex(sBuffer, 63, "%s %s by FEDERICOMB", g_sPluginName, g_sPluginVersion);
+	formatex(sBuffer, 63, "%s %s by FEDERICOMB", g_szPluginName, g_szPluginVersion);
 	set_pcvar_string(create_cvar("dm_version", sBuffer, FCVAR_SERVER | FCVAR_SPONLY), sBuffer);
 	set_pcvar_string(create_cvar("csdm_version", sBuffer, FCVAR_SERVER | FCVAR_SPONLY), sBuffer);
 	set_pcvar_string(create_cvar("csdm_active", "1", FCVAR_SERVER | FCVAR_SPONLY), "1");
@@ -154,7 +151,7 @@ public plugin_precache()
 
 public plugin_init()
 {
-	register_plugin(g_sPluginName, g_sPluginVersion, g_sPluginAuthor);
+	register_plugin(g_szPluginName, g_szPluginVersion, g_szPluginAuthor);
 
 	g_aSpawns = ArrayCreate(ArraySpawns_e);
 
@@ -165,9 +162,6 @@ public plugin_init()
 	bind_pcvar_num(create_cvar("csdm_drop_medic", "0"), g_iCSDM_MedicKit);
 	bind_pcvar_num(get_cvar_pointer("mp_freeforall"), g_iCSDM_FreeForAll);
 	bind_pcvar_float(get_cvar_pointer("mp_item_staytime"), g_flCSDM_ItemStaytime);
-
-	UTIL_RegisterClientCommandAll("guns", "ClientCommand__Weapons");
-	UTIL_RegisterClientCommandAll("armas", "ClientCommand__Weapons");
 
 	RegisterHookChain(RG_CBasePlayer_Spawn, "OnCBasePlayer_Spawn_Post", 1);
 	RegisterHookChain(RG_CBasePlayer_TraceAttack, "OnCBasePlayer_TraceAttack");
@@ -182,6 +176,9 @@ public plugin_init()
 	register_message(get_user_msgid("SendAudio"), "message__SendAudio");
 
 	set_msg_block(get_user_msgid("Radar"), BLOCK_SET);
+
+	UTIL_RegisterClientCommandAll("guns", "ClientCommand__Weapons");
+	UTIL_RegisterClientCommandAll("armas", "ClientCommand__Weapons");
 
 	g_iSyncHudDamage = CreateHudSyncObj();
 }
@@ -199,6 +196,10 @@ public plugin_end()
 
 	if(g_aSpawns != Invalid_Array) ArrayDestroy(g_aSpawns);
 }
+
+/* ===========================================================================
+* 				[ Zone Events ]
+* ============================================================================ */
 
 loadSpawns()
 {
@@ -225,33 +226,6 @@ loadSpawns()
 	return iCount;
 }
 
-loadMenus()
-{
-	// Primary Weapons
-	{
-		g_iGlobalMenuOne = menu_create(fmt("\y%s :\w Armas primarias\R\y", g_sPluginName), "menu__PrimaryWeapons");
-
-		for(new i = 0; i < sizeof(PRIMARY_WEAPONS); ++i)
-			menu_additem(g_iGlobalMenuOne, PRIMARY_WEAPONS[i][weaponNames]);
-
-		menu_setprop(g_iGlobalMenuOne, MPROP_NEXTNAME, "Página siguiente");
-		menu_setprop(g_iGlobalMenuOne, MPROP_BACKNAME, "Página anterior");
-		menu_setprop(g_iGlobalMenuOne, MPROP_EXITNAME, "Salir");
-	}
-
-	// Secondary Weapons
-	{
-		g_iGlobalMenuTwo = menu_create(fmt("\y%s :\w Armas secundarias\R\y", g_sPluginName), "menu__SecondaryWeapons");
-
-		for(new i = 0; i < sizeof(SECONDARY_WEAPONS); ++i)
-			menu_additem(g_iGlobalMenuTwo, SECONDARY_WEAPONS[i][weaponNames]);
-
-		menu_setprop(g_iGlobalMenuTwo, MPROP_NEXTNAME, "Página siguiente");
-		menu_setprop(g_iGlobalMenuTwo, MPROP_BACKNAME, "Página anterior");
-		menu_setprop(g_iGlobalMenuTwo, MPROP_EXITNAME, "Salir");
-	}
-}
-
 public client_putinserver(id)
 {
 	SetPlayerBit(g_bConnected, id);
@@ -272,26 +246,6 @@ public client_disconnected(id)
 	ClearPlayerBit(g_bAlive, id);
 }
 
-/*************************************************************************************/
-/********************************* CLIENT COMMANDS  *********************************/
-/*************************************************************************************/
-
-public ClientCommand__Weapons(const id)
-{
-	if( !g_iDontShowTheMenuAgain[id] )
-	{
-		return PLUGIN_HANDLED;
-	}
-
-	g_iDontShowTheMenuAgain[id] = 0;
-	client_print_color(id, print_team_default, "%sEn tu próxima regeneración podrás seleccionar nuevas armas!", g_sGlobalPrefix);
-
-	return PLUGIN_HANDLED;
-}
-
-/*************************************************************************************/
-/************************************ HAM PLAYER *************************************/
-/*************************************************************************************/
 public OnCBasePlayer_Spawn_Post(const this)
 {
 	if(!is_user_alive(this))
@@ -399,6 +353,111 @@ public OnCBasePlayer_Killed(const this, pevAttacker, iGib)
 	return HC_CONTINUE;
 }
 
+public OnFw__Spawn(const entity)
+{
+	if(is_nullent(entity))
+		return FMRES_IGNORED;
+
+	new szClassName[32];
+	get_entvar(entity, var_classname, szClassName, charsmax(szClassName));
+
+	for(new i = 0; i < sizeof(OBJECTIVES_ENTITIES); ++i)
+	{
+		if(equal(szClassName, OBJECTIVES_ENTITIES[i]))
+		{
+			remove_entity(entity);
+			return FMRES_SUPERCEDE;
+		}
+	}
+	
+	return FMRES_IGNORED;
+}
+
+public OnFw__ClientKill()
+{
+	return FMRES_SUPERCEDE;
+}
+
+public message__RoundTime(const msgId, const destId, const id)
+{
+	set_msg_arg_int(1, ARG_SHORT, get_timeleft());
+}
+
+public message__TextMsg(const msgId, const destId, const id)
+{
+	static szMsg[22];
+	get_msg_arg_string(2, szMsg, charsmax(szMsg));
+
+	for(new i = 0; i < sizeof(TXTMSG_BLOCK); ++i)
+	{
+		if(equal(szMsg, TXTMSG_BLOCK[i]))
+			return PLUGIN_HANDLED;
+	}
+
+	// #Fire_in_the_hole
+	if(get_msg_args() == 5 && (get_msg_argtype(5) == ARG_STRING))
+	{
+		get_msg_arg_string(5, szMsg, 21);
+
+		if(equal(szMsg, "#Fire_in_the_hole"))
+			return PLUGIN_HANDLED;
+	}
+	else if(get_msg_args() == 6 && (get_msg_argtype(6) == ARG_STRING))
+	{
+		get_msg_arg_string(6, szMsg, 21);
+		
+		if(equal(szMsg, "#Fire_in_the_hole"))
+			return PLUGIN_HANDLED;
+	}
+	
+	return PLUGIN_CONTINUE;
+}
+
+public message__SendAudio(const msgId, const destId, const id)
+{
+	static szAudio[19];
+	get_msg_arg_string(2, szAudio, charsmax(szAudio));
+
+	for(new i = 0; i < sizeof(SENDAUDIO_BLOCK); ++i)
+	{
+		if(equal(szAudio, SENDAUDIO_BLOCK[i]))
+			return PLUGIN_HANDLED;
+	}
+
+	return PLUGIN_CONTINUE;
+}
+
+/* ===========================================================================
+* 				[ Client Menus ]
+* ============================================================================ */
+
+loadMenus()
+{
+	// Primary Weapons
+	{
+		g_iGlobalMenuOne = menu_create(fmt("\y%s :\w Armas primarias\R\y", g_szPluginName), "menu__PrimaryWeapons");
+
+		for(new i = 0; i < sizeof(PRIMARY_WEAPONS); ++i)
+			menu_additem(g_iGlobalMenuOne, PRIMARY_WEAPONS[i][weaponNames]);
+
+		menu_setprop(g_iGlobalMenuOne, MPROP_NEXTNAME, "Página siguiente");
+		menu_setprop(g_iGlobalMenuOne, MPROP_BACKNAME, "Página anterior");
+		menu_setprop(g_iGlobalMenuOne, MPROP_EXITNAME, "Salir");
+	}
+
+	// Secondary Weapons
+	{
+		g_iGlobalMenuTwo = menu_create(fmt("\y%s :\w Armas secundarias\R\y", g_szPluginName), "menu__SecondaryWeapons");
+
+		for(new i = 0; i < sizeof(SECONDARY_WEAPONS); ++i)
+			menu_additem(g_iGlobalMenuTwo, SECONDARY_WEAPONS[i][weaponNames]);
+
+		menu_setprop(g_iGlobalMenuTwo, MPROP_NEXTNAME, "Página siguiente");
+		menu_setprop(g_iGlobalMenuTwo, MPROP_BACKNAME, "Página anterior");
+		menu_setprop(g_iGlobalMenuTwo, MPROP_EXITNAME, "Salir");
+	}
+}
+
 public OnTaskShowMenuWeapons(const id)
 {
 	if(!GetPlayerBit(g_bAlive, id))
@@ -409,12 +468,10 @@ public OnTaskShowMenuWeapons(const id)
 		giveWeapons(id, 1);
 		giveWeapons(id, 2);
 
-		rg_give_item(id, "weapon_knife");
-
 		return;
 	}
 
-	new iMenuId = menu_create(fmt("\y%s : Equipamiento", g_sPluginName, g_sPluginAuthor), "menu__Equip");
+	new iMenuId = menu_create(fmt("\y%s : Equipamiento", g_szPluginName, g_szPluginAuthor), "menu__Equip");
 
 	menu_additem(iMenuId, "Armas Nuevas");
 	menu_additem(iMenuId, "Selección Anterior");
@@ -453,7 +510,7 @@ public menu__Equip(const id, const menuid, const itemid)
 			giveWeapons(id, 1);
 			giveWeapons(id, 2);
 
-			client_print_color(id, print_team_default, "%sEscribe^4 guns^1 para activar nuevamente el menú de armamento", g_sGlobalPrefix);
+			client_print_color(id, print_team_default, "%sEscribe^4 guns^1 para activar nuevamente el menú de armamento", g_szGlobalPrefix);
 		}
 	}
 
@@ -542,90 +599,28 @@ public giveWeapons(const id, const weapon)
 	}
 }
 
-/*************************************************************************************/
-/************************************** THINKS  **************************************/
-/*************************************************************************************/
+/* ===========================================================================
+* 				[ Client Commands ]
+* ============================================================================ */
 
-public OnFw__Spawn(const entity)
+public ClientCommand__Weapons(const id)
 {
-	if(is_nullent(entity))
-		return FMRES_IGNORED;
-
-	new szClassName[32];
-	get_entvar(entity, var_classname, szClassName, charsmax(szClassName));
-
-	for(new i = 0; i < sizeof(OBJECTIVES_ENTITIES); ++i)
+	if(!g_iDontShowTheMenuAgain[id])
 	{
-		if(equal(szClassName, OBJECTIVES_ENTITIES[i]))
-		{
-			remove_entity(entity);
-			return FMRES_SUPERCEDE;
-		}
-	}
-	
-	return FMRES_IGNORED;
-}
-
-public OnFw__ClientKill()
-{
-	return FMRES_SUPERCEDE;
-}
-
-/*************************************************************************************/
-/************************************* MESSAGES  *************************************/
-/*************************************************************************************/
-public message__RoundTime(const msgId, const destId, const id)
-{
-	set_msg_arg_int(1, ARG_SHORT, get_timeleft());
-}
-
-public message__TextMsg(const msgId, const destId, const id)
-{
-	static szMsg[22];
-	get_msg_arg_string(2, szMsg, charsmax(szMsg));
-
-	for(new i = 0; i < sizeof(TXTMSG_BLOCK); ++i)
-	{
-		if(equal(szMsg, TXTMSG_BLOCK[i]))
-			return PLUGIN_HANDLED;
+		OnTaskShowMenuWeapons(id);
+		return PLUGIN_HANDLED;
 	}
 
-	// #Fire_in_the_hole
-	if(get_msg_args() == 5 && (get_msg_argtype(5) == ARG_STRING))
-	{
-		get_msg_arg_string(5, szMsg, 21);
+	g_iDontShowTheMenuAgain[id] = 0;
+	client_print_color(id, print_team_default, "%sEn tu próxima regeneración podrás seleccionar nuevas armas!", g_szGlobalPrefix);
 
-		if(equal(szMsg, "#Fire_in_the_hole"))
-			return PLUGIN_HANDLED;
-	}
-	else if(get_msg_args() == 6 && (get_msg_argtype(6) == ARG_STRING))
-	{
-		get_msg_arg_string(6, szMsg, 21);
-		
-		if(equal(szMsg, "#Fire_in_the_hole"))
-			return PLUGIN_HANDLED;
-	}
-	
-	return PLUGIN_CONTINUE;
+	return PLUGIN_HANDLED;
 }
 
-public message__SendAudio(const msgId, const destId, const id)
-{
-	static szAudio[19];
-	get_msg_arg_string(2, szAudio, charsmax(szAudio));
+/* ===========================================================================
+* 				[ Util Stuff ]
+* ============================================================================ */
 
-	for(new i = 0; i < sizeof(SENDAUDIO_BLOCK); ++i)
-	{
-		if(equal(szAudio, SENDAUDIO_BLOCK[i]))
-			return PLUGIN_HANDLED;
-	}
-
-	return PLUGIN_CONTINUE;
-}
-
-/*************************************************************************************/
-/************************************ STOCKS, ETC ************************************/
-/*************************************************************************************/
 public randomSpawn(const id)
 {
 	new iArraySize = ArraySize(g_aSpawns);
