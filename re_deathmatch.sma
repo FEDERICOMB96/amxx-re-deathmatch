@@ -1,17 +1,14 @@
 #include <amxmodx>
 #include <reapi>
-#include <amxmisc>
 #include <cstrike>
 #include <engine>
 #include <fakemeta>
-#include <fun>
-#include <hamsandwich>
 #include <xs>
 
 #pragma semicolon 1
 
 new const g_sPluginName[] = "DEATHMATCH";
-new const g_sPluginVersion[] = "v5";
+new const g_sPluginVersion[] = "v6";
 new const g_sPluginAuthor[] = "FEDERICOMB";
 
 new const g_sGlobalPrefix[] = "^4[DEATHMATCH]^1 ";
@@ -39,8 +36,8 @@ enum _:structWeaponData {
 new g_iWeaponData[MAX_USERS][structWeaponData];
 
 /// Global Vars
-new g_iSpawnCount = 0;
-new g_iSyncHudDamage = 0;
+new g_iSpawnCount;
+new g_iSyncHudDamage;
 new g_iGlobalMenuOne;
 new g_iGlobalMenuTwo;
 
@@ -53,12 +50,13 @@ new Float:g_fSpawns[MAX_CSDM_SPAWNS][3];
 new Float:g_fSpawnsAngles[MAX_CSDM_SPAWNS][3];
 
 // Cvars
-new g_iCSDM_OnlyHead = 0;
-new g_iCSDM_FreeForAll = 0;
-new g_iCSDM_MedicKit = 0;
+new g_iCSDM_OnlyHead;
+new g_iCSDM_MedicKit;
+new g_iCSDM_FreeForAll;
+new Float:g_flCSDM_ItemStaytime;
 
 /// Forward Vars
-new g_Forward_Spawn = 0;
+new g_Forward_Spawn;
 
 enum _:e_StructWeapons
 {
@@ -163,25 +161,20 @@ public plugin_init()
 	bind_pcvar_num(create_cvar("csdm_only_head", "0"), g_iCSDM_OnlyHead);
 	bind_pcvar_num(create_cvar("csdm_drop_medic", "0"), g_iCSDM_MedicKit);
 	bind_pcvar_num(get_cvar_pointer("mp_freeforall"), g_iCSDM_FreeForAll);
+	bind_pcvar_float(get_cvar_pointer("mp_item_staytime"), g_flCSDM_ItemStaytime);
 
 	register_concmd("csdm_reload_spawns", "ConsoleCommand__Spawns");
 
 	UTIL_RegisterClientCommandAll("guns", "ClientCommand__Weapons");
 	UTIL_RegisterClientCommandAll("armas", "ClientCommand__Weapons");
 
-	RegisterHamPlayer(Ham_Spawn, "OnHam__PlayerSpawn_Post", 1);
-	RegisterHamPlayer(Ham_TraceAttack, "OnHam__PlayerTraceAttack");
-	RegisterHamPlayer(Ham_Killed, "OnHam__PlayerKilled");
+	RegisterHookChain(RG_CBasePlayer_Spawn, "OnCBasePlayer_Spawn_Post", 1);
+	RegisterHookChain(RG_CBasePlayer_TraceAttack, "OnCBasePlayer_TraceAttack");
+	RegisterHookChain(RG_CBasePlayer_Killed, "OnCBasePlayer_Killed");
 
 	unregister_forward(FM_Spawn, g_Forward_Spawn);
 
 	register_forward(FM_ClientKill, "OnFw__ClientKill");
-
-	if( g_iCSDM_MedicKit )
-	{
-		register_touch(CLASSNAME_ENT_MEDKIT, "player", "touch__MedicKit");
-		register_think(CLASSNAME_ENT_MEDKIT, "think__MedicKit");
-	}
 
 	register_message(get_user_msgid("RoundTime"), "message__RoundTime");
 	register_message(get_user_msgid("TextMsg"), "message__TextMsg");
@@ -320,27 +313,27 @@ public ClientCommand__Weapons(const id)
 /*************************************************************************************/
 /************************************ HAM PLAYER *************************************/
 /*************************************************************************************/
-public OnHam__PlayerSpawn_Post(const id)
+public OnCBasePlayer_Spawn_Post(const this)
 {
-	if(!is_user_alive(id))
+	if(!is_user_alive(this))
 		return;
 	
-	SetPlayerBit(g_bAlive, id);
+	SetPlayerBit(g_bAlive, this);
 
-	if(g_iCSDM_FreeForAll && GetUserTeam(id) != TEAM_TERRORIST)
-		rg_set_user_team(id, TEAM_TERRORIST);
+	if(g_iCSDM_FreeForAll && GetUserTeam(this) != TEAM_TERRORIST)
+		rg_set_user_team(this, TEAM_TERRORIST);
 
-	randomSpawn(id);
+	randomSpawn(this);
 
-	OnTaskShowMenuWeapons(id);
+	OnTaskShowMenuWeapons(this);
 
-	set_member(id, m_iHideHUD, get_member(id, m_iHideHUD) | HIDEHUD_MONEY);
+	set_member(this, m_iHideHUD, get_member(this, m_iHideHUD) | HIDEHUD_MONEY);
 }
 
-public OnHam__PlayerTraceAttack( const victim, const attacker, const Float:damage, const Float:direction[3], const tracehandle, const damage_type )
+public OnCBasePlayer_TraceAttack(const this, pevAttacker, Float:flDamage, Float:vecDir[3], tracehandle, bitsDamageType)
 {
-	if(victim == attacker || !IsConnected(attacker))
-		return HAM_IGNORED;
+	if(this == pevAttacker || !IsConnected(pevAttacker))
+		return HC_CONTINUE;
 
 	if(g_iCSDM_OnlyHead)
 	{
@@ -349,95 +342,82 @@ public OnHam__PlayerTraceAttack( const victim, const attacker, const Float:damag
 
 		if(iHitGroup != HIT_HEAD)
 		{
-			if(GetCurrentWeapon(attacker) == WEAPON_KNIFE)
-			{
-				set_hudmessage(255, 255, 0, -1.0, 0.57, 0, 0.0, 1.0, 0.0, 0.4, 2);
-				ShowSyncHudMsg(attacker, g_iSyncHudDamage, "¡APUNTA A LA CABEZA!");
-			}
+			set_hudmessage(255, 255, 0, -1.0, 0.57, 0, 0.0, 1.0, 0.0, 0.4, 2);
+			ShowSyncHudMsg(pevAttacker, g_iSyncHudDamage, "¡APUNTA A LA CABEZA!");
 
-			return HAM_SUPERCEDE;
+			return HC_SUPERCEDE;
 		}
 	}
 
-	return HAM_IGNORED;
+	return HC_CONTINUE;
 }
 
-public OnHam__PlayerKilled( const victim, const killer, const shouldgib )
+public OnCBasePlayer_Killed(const this, pevAttacker, iGib)
 {
-	ClearPlayerBit(g_bAlive, victim);
+	ClearPlayerBit(g_bAlive, this);
 
-	arrayset(g_iWeaponData[victim], 0, structWeaponData);
+	arrayset(g_iWeaponData[this], 0, structWeaponData);
 
 	new WeaponIdType:iWid;
 
-	if( PRIMARY_WEAPONS[g_iPrimaryWeapons[victim]][weaponSilenced] )
+	if( PRIMARY_WEAPONS[g_iPrimaryWeapons[this]][weaponSilenced] )
 	{
-		iWid = PRIMARY_WEAPONS[g_iPrimaryWeapons[victim]][weaponId];
+		iWid = PRIMARY_WEAPONS[g_iPrimaryWeapons[this]][weaponId];
 
-		if(user_has_weapon(victim, _:iWid) && is_valid_ent(g_iPrimaryWeaponsEnt[victim]))
+		if(user_has_weapon(this, _:iWid) && !is_nullent(g_iPrimaryWeaponsEnt[this]))
 		{
 			switch(iWid)
 			{
-				case CSW_M4A1: g_iWeaponData[victim][weaponM4A1] = cs_get_weapon_silen(g_iPrimaryWeaponsEnt[victim]);
-				case CSW_FAMAS: g_iWeaponData[victim][weaponFAMAS] = cs_get_weapon_burst(g_iPrimaryWeaponsEnt[victim]);
+				case CSW_M4A1: g_iWeaponData[this][weaponM4A1] = GetWeaponSilen(g_iPrimaryWeaponsEnt[this]);
+				case CSW_FAMAS: g_iWeaponData[this][weaponFAMAS] = GetWeaponBurst(g_iPrimaryWeaponsEnt[this]);
 			}
 		}
 	}
 
-	if(SECONDARY_WEAPONS[g_iSecondaryWeapons[victim]][weaponSilenced])
+	if(SECONDARY_WEAPONS[g_iSecondaryWeapons[this]][weaponSilenced])
 	{
-		iWid = SECONDARY_WEAPONS[g_iSecondaryWeapons[victim]][weaponId];
+		iWid = SECONDARY_WEAPONS[g_iSecondaryWeapons[this]][weaponId];
 
-		if(user_has_weapon(victim, _:iWid) && is_valid_ent(g_iSecondaryWeaponsEnt[victim]))
+		if(user_has_weapon(this, _:iWid) && !is_nullent(g_iSecondaryWeaponsEnt[this]))
 		{
 			switch(iWid)
 			{
-				case CSW_USP: g_iWeaponData[victim][weaponUSP] = cs_get_weapon_silen(g_iSecondaryWeaponsEnt[victim]);
-				case CSW_GLOCK18: g_iWeaponData[victim][weaponGLOCK] = cs_get_weapon_burst(g_iSecondaryWeaponsEnt[victim]);
+				case CSW_USP: g_iWeaponData[this][weaponUSP] = GetWeaponSilen(g_iSecondaryWeaponsEnt[this]);
+				case CSW_GLOCK18: g_iWeaponData[this][weaponGLOCK] = GetWeaponBurst(g_iSecondaryWeaponsEnt[this]);
 			}
 		}
 	}
 
-	if(get_pdata_int(victim, 76) == DMG_FALL
-	|| (IsConnected(killer) && (GetCurrentWeapon(killer) == WEAPON_AWP || GetCurrentWeapon(killer) == WEAPON_SCOUT) && get_pdata_int(victim, 75) == HIT_HEAD))
+	if(get_member(this, m_bitsDamageType) == DMG_FALL
+	|| (IsConnected(pevAttacker) && (GetCurrentWeapon(pevAttacker) == WEAPON_AWP || GetCurrentWeapon(pevAttacker) == WEAPON_SCOUT) && get_member(this, m_LastHitGroup) == HIT_HEAD))
 	{
-		SetHamParamInteger(3, 2);
+		SetHookChainArg(3, ATYPE_INTEGER, 2);
 	}
 
-	if(killer == victim || !IsConnected(killer))
-		return HAM_IGNORED;
+	if(pevAttacker == this || !IsConnected(pevAttacker))
+		return HC_CONTINUE;
 
-	if(GetPlayerBit(g_bAlive, killer))
-	{
-		set_user_armor(killer, 100);
-		cs_set_user_armor(killer, 100, CS_ARMOR_VESTHELM);
-	}
+	if(GetPlayerBit(g_bAlive, pevAttacker))
+		cs_set_user_armor(pevAttacker, 100, CS_ARMOR_VESTHELM);
 
 	if(g_iCSDM_MedicKit)
 	{
-		if(random_num(0, 14) <= 3)
-		{
-			new Float:vecOrigin[3];
-			new Float:vecEndOrigin[3];
-			new Float:fFraction;
-			new iTraceResult;
-			
-			entity_get_vector(victim, EV_VEC_origin, vecOrigin);
-			getDropOrigin(victim, vecEndOrigin, 20);
-			
-			iTraceResult = 0;
-			engfunc(EngFunc_TraceLine, vecOrigin, vecEndOrigin, IGNORE_MONSTERS, victim, iTraceResult);
-			
-			get_tr2(iTraceResult, TR_flFraction, fFraction);
-			
-			if(fFraction == 1.0)
-			{
-				dropEntForHumans(victim);
-			}
-		}
+		new Float:vecOrigin[3];
+		new Float:vecEndOrigin[3];
+		new Float:flFraction;
+		
+		get_entvar(this, var_origin, vecOrigin);
+		GetDropOrigin(this, vecEndOrigin, 20);
+		
+		engfunc(EngFunc_TraceLine, vecOrigin, vecEndOrigin, IGNORE_MONSTERS, this, 0);
+		
+		get_tr2(0, TR_flFraction, flFraction);
+		
+		if(flFraction == 1.0)
+			DropMedKit(this);
 	}
 
-	return HAM_IGNORED;
+	return HC_CONTINUE;
 }
 
 public OnTaskShowMenuWeapons(const id)
@@ -549,7 +529,7 @@ public giveWeapons(const id, const weapon)
 
 			g_iPrimaryWeaponsEnt[id] = rg_give_item(id, PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponEnt]);
 
-			if((iWid == WEAPON_M4A1 || iWid == WEAPON_FAMAS) && is_valid_ent(g_iPrimaryWeaponsEnt[id]))
+			if((iWid == WEAPON_M4A1 || iWid == WEAPON_FAMAS) && !is_nullent(g_iPrimaryWeaponsEnt[id]))
 			{
 				switch(iWid)
 				{
@@ -571,7 +551,7 @@ public giveWeapons(const id, const weapon)
 
 			g_iSecondaryWeaponsEnt[id] = rg_give_item(id, SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponEnt]);
 
-			if((iWid == WEAPON_USP || iWid == WEAPON_GLOCK18) && is_valid_ent(g_iSecondaryWeaponsEnt[id]))
+			if((iWid == WEAPON_USP || iWid == WEAPON_GLOCK18) && !is_nullent(g_iSecondaryWeaponsEnt[id]))
 			{
 				switch(iWid)
 				{
@@ -586,49 +566,20 @@ public giveWeapons(const id, const weapon)
 /*************************************************************************************/
 /************************************** THINKS  **************************************/
 /*************************************************************************************/
-public think__MedicKit(const medickit) {
-	if(is_valid_ent(medickit)) {
-		static Float:fRenderAmt;
-		fRenderAmt = entity_get_float(medickit, EV_FL_renderamt);
-		
-		if(fRenderAmt == 255.0) {
-			entity_set_int(medickit, EV_INT_movetype, MOVETYPE_FLY);
-			entity_set_int(medickit, EV_INT_rendermode, kRenderTransAlpha);
-			entity_set_int(medickit, EV_INT_renderfx, kRenderFxGlowShell);
-			
-			entity_set_vector(medickit, EV_VEC_rendercolor, Float:{255.0, 255.0, 0.0});
-			entity_set_vector(medickit, EV_VEC_velocity, Float:{0.0, 0.0, 20.0});
-			
-			entity_set_float(medickit, EV_FL_renderamt, fRenderAmt - 25.0);
-			entity_set_float(medickit, EV_FL_nextthink, get_gametime() + 0.01);
-			
-			return;
-		}
-		
-		fRenderAmt -= 25.0;
-		
-		if(fRenderAmt < 0.0) {
-			remove_entity(medickit);
-			return;
-		}
-		
-		entity_set_float(medickit, EV_FL_renderamt, fRenderAmt);
-		entity_set_float(medickit, EV_FL_nextthink, get_gametime() + 0.1);
-	}
-}
 
-public OnFw__Spawn(const iEntity) {
-	if(!is_valid_ent(iEntity)) {
+public OnFw__Spawn(const entity)
+{
+	if(is_nullent(entity))
 		return FMRES_IGNORED;
-	}
 
-	new sClassName[32];
-	entity_get_string(iEntity, EV_SZ_classname, sClassName, 31);
-	
-	new i;
-	for(i = 0; i < sizeof(OBJECTIVES_ENTITIES); ++i) {
-		if(equal(sClassName, OBJECTIVES_ENTITIES[i])) {
-			remove_entity(iEntity);
+	new szClassName[32];
+	get_entvar(entity, var_classname, szClassName, charsmax(szClassName));
+
+	for(new i = 0; i < sizeof(OBJECTIVES_ENTITIES); ++i)
+	{
+		if(equal(szClassName, OBJECTIVES_ENTITIES[i]))
+		{
+			remove_entity(entity);
 			return FMRES_SUPERCEDE;
 		}
 	}
@@ -641,31 +592,6 @@ public OnFw__ClientKill()
 	return FMRES_SUPERCEDE;
 }
 
-public touch__MedicKit(const medickit, const id)
-{
-	if( !is_nullent(medickit) || !IsAlive(id) )
-	{
-		return;
-	}
-
-	new iHealth = get_user_health(id);
-
-	if( iHealth < 100 )
-	{
-		iHealth += 15;
-
-		if( iHealth > 100 )
-		{
-			iHealth = 100;
-		}
-
-		set_user_health(id, iHealth);
-		
-		emitSound(id, CHAN_ITEM, g_sSound_MedicKit);
-		
-		remove_entity(medickit);
-	}
-}
 /*************************************************************************************/
 /************************************* MESSAGES  *************************************/
 /*************************************************************************************/
@@ -738,7 +664,7 @@ public randomSpawn(const id)
 
 	new Float:fOriginPlayer[MAX_USERS][3];
 	
-	iHull = (get_entity_flags(id) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN;
+	iHull = (get_entvar(id, var_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN;
 	iSpawnId = random_num(0, g_iSpawnCount - 1);
 	iTeam = GetUserTeam(id);
 
@@ -749,7 +675,7 @@ public randomSpawn(const id)
 			continue;
 		}
 
-		entity_get_vector(i, EV_VEC_origin, fOriginPlayer[iCount++]);
+		get_entvar(i, var_origin, fOriginPlayer[iCount++]);
 	}
 
 	while(iSpawnPass <= g_iSpawnCount) {
@@ -794,11 +720,11 @@ public randomSpawn(const id)
 	}
 
 	if(iFinal != -1) {
-		entity_set_int(id, EV_INT_fixangle, 1);
-		entity_set_vector(id, EV_VEC_angles, g_fSpawnsAngles[iFinal]);
-		entity_set_int(id, EV_INT_fixangle, 1);
+		set_entvar(id, var_fixangle, 1);
+		set_entvar(id, var_angles, g_fSpawnsAngles[iFinal]);
+		set_entvar(id, var_fixangle, 1);
 		
-		entity_set_vector(id, EV_VEC_origin, g_fSpawns[iFinal]);
+		set_entvar(id, var_origin, g_fSpawns[iFinal]);
 	}
 
 	set_task(0.25, "checkStuck", id);
@@ -822,11 +748,12 @@ public isHullVacant(const Float:origin[3], const hull) {
 	return 0;
 }
 
-public isUserStuck(const id) {
+public isUserStuck(const id)
+{
 	new Float:vecOrigin[3];
-	entity_get_vector(id, EV_VEC_origin, vecOrigin);
+	get_entvar(id, var_origin, vecOrigin);
 	
-	engfunc(EngFunc_TraceHull, vecOrigin, vecOrigin, 0, (entity_get_int(id, EV_INT_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN, id, 0);
+	engfunc(EngFunc_TraceHull, vecOrigin, vecOrigin, 0, (get_entvar(id, var_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN, id, 0);
 	
 	if(get_tr2(0, TR_StartSolid) || get_tr2(0, TR_AllSolid) || !get_tr2(0, TR_InOpen)) {
 		return 1;
@@ -850,45 +777,108 @@ setAnimation(const id, const animation)
 	message_end();
 }
 
-emitSound(const id, const channel, const sample[], Float:vol = 1.0, Float:att = ATTN_NORM, flags = 0, pitch = PITCH_NORM) {
-	emit_sound(id, channel, sample, vol, att, flags, pitch);
-}
-
-dropEntForHumans(const id) {
-	new iEnt = create_entity("info_target");
+DropMedKit(const id)
+{
+	new iEnt = rg_create_entity("info_target");
 	
-	if(is_valid_ent(iEnt)) {
+	if(!is_nullent(iEnt))
+	{
 		new Float:vecVelocity[3];
 		new Float:vecOrigin[3];
 		
-		entity_set_string(iEnt, EV_SZ_classname, CLASSNAME_ENT_MEDKIT);
+		set_entvar(iEnt, var_classname, CLASSNAME_ENT_MEDKIT);
 		entity_set_model(iEnt, g_sModel_MedicKit);
 		entity_set_size(iEnt, Float:{-23.16, -13.66, 0.0}, Float:{11.47, 12.78, 6.72});
 		
-		entity_set_int(iEnt, EV_INT_solid, SOLID_TRIGGER);
-		entity_set_int(iEnt, EV_INT_movetype, MOVETYPE_TOSS);
-		entity_set_int(iEnt, EV_INT_rendermode, kRenderNormal);
-		entity_set_int(iEnt, EV_INT_renderfx, kRenderFxNone);
+		set_entvar(iEnt, var_solid, SOLID_TRIGGER);
+		set_entvar(iEnt, var_movetype, MOVETYPE_TOSS);
+		set_entvar(iEnt, var_rendermode, kRenderNormal);
+		set_entvar(iEnt, var_renderfx, kRenderFxNone);
 		
 		velocity_by_aim(id, 300, vecVelocity);
-		getDropOrigin(id, vecOrigin);
-		entity_set_vector(iEnt, EV_VEC_origin, vecOrigin);
-		entity_set_vector(iEnt, EV_VEC_velocity, vecVelocity);
-		entity_set_vector(iEnt, EV_VEC_mins, Float:{-23.16, -13.66, 0.0});
-		entity_set_vector(iEnt, EV_VEC_maxs, Float:{11.47, 12.78, 6.72});
+		GetDropOrigin(id, vecOrigin);
+		set_entvar(iEnt, var_origin, vecOrigin);
+		set_entvar(iEnt, var_velocity, vecVelocity);
 		
-		entity_set_float(iEnt, EV_FL_renderamt, 255.0);
-		entity_set_float(iEnt, EV_FL_takedamage, DAMAGE_NO);
-		entity_set_float(iEnt, EV_FL_nextthink, get_gametime() + 15.0);
+		set_entvar(iEnt, var_renderamt, 255.0);
+		set_entvar(iEnt, var_takedamage, DAMAGE_NO);
+
+		SetTouch(iEnt, "OnTouch_MedicKit");
+		SetThink(iEnt, "OnThink_MedicKit");
+
+		set_entvar(iEnt, var_nextthink, get_gametime() + g_flCSDM_ItemStaytime);
 	}
 }
 
-getDropOrigin(const id, Float:vecOrigin[3], iVelAdd = 0) {
+public OnTouch_MedicKit(const medickit, const id)
+{
+	if(is_nullent(medickit) || !IsAlive(id))
+		return;
+
+	new Float:flHealth = Float:get_entvar(id, var_health);
+
+	if(flHealth < 100.0)
+	{
+		set_entvar(id, var_health, floatmin((flHealth + 15.0), 100.0));
+		
+		rh_emit_sound2(id, 0, CHAN_ITEM, g_sSound_MedicKit);
+		
+		SetTouch(medickit, "");
+		SetThink(medickit, "");
+
+		set_entvar(medickit, var_modelindex, 0);
+		set_entvar(medickit, var_solid, SOLID_NOT);
+		set_entvar(medickit, var_flags, FL_KILLME);
+	}
+}
+
+public OnThink_MedicKit(const medickit)
+{
+	if(is_nullent(medickit))
+		return;
+
+	static Float:flRenderAmt;
+	flRenderAmt = Float:get_entvar(medickit, var_renderamt);
+	
+	if(flRenderAmt == 255.0)
+	{
+		set_entvar(medickit, var_solid, SOLID_NOT);
+		set_entvar(medickit, var_movetype, MOVETYPE_FLY);
+		set_entvar(medickit, var_rendermode, kRenderTransAlpha);
+		
+		set_entvar(medickit, var_velocity, Float:{0.0, 0.0, 20.0});
+		set_entvar(medickit, var_avelocity, Float:{0.0, 120.0, 0.0});
+		
+		set_entvar(medickit, var_renderamt, flRenderAmt - 15.0);
+		set_entvar(medickit, var_nextthink, get_gametime() + 0.01);
+		
+		return;
+	}
+	
+	flRenderAmt -= 15.0;
+	
+	if(flRenderAmt < 0.0)
+	{
+		SetTouch(medickit, "");
+		SetThink(medickit, "");
+
+		set_entvar(medickit, var_modelindex, 0);
+		set_entvar(medickit, var_solid, SOLID_NOT);
+		set_entvar(medickit, var_flags, FL_KILLME);
+		return;
+	}
+	
+	set_entvar(medickit, var_renderamt, flRenderAmt);
+	set_entvar(medickit, var_nextthink, get_gametime() + 0.1);
+}
+
+GetDropOrigin(const id, Float:vecOrigin[3], iVelAdd = 0)
+{
 	new Float:vecAim[3];
 	new Float:vecViewOfs[3];
 	
-	entity_get_vector(id, EV_VEC_view_ofs, vecViewOfs);
-	entity_get_vector(id, EV_VEC_origin, vecOrigin);
+	get_entvar(id, var_view_ofs, vecViewOfs);
+	get_entvar(id, var_origin, vecOrigin);
 	xs_vec_add(vecOrigin, vecViewOfs, vecOrigin);
 	
 	velocity_by_aim(id, 50 + iVelAdd, vecAim);
@@ -900,6 +890,28 @@ getDropOrigin(const id, Float:vecOrigin[3], iVelAdd = 0) {
 WeaponIdType:GetCurrentWeapon(const id)
 {
 	return WeaponIdType:get_member(get_member(id, m_pActiveItem), m_iId);
+}
+
+bool:GetWeaponBurst(const pWeapon)
+{
+	switch(WeaponIdType:get_member(pWeapon, m_iId))
+	{
+		case WEAPON_GLOCK18: return bool:(get_member(pWeapon, m_Weapon_iWeaponState) & WPNSTATE_GLOCK18_BURST_MODE);
+		case WEAPON_FAMAS:   return bool:(get_member(pWeapon, m_Weapon_iWeaponState) & WPNSTATE_FAMAS_BURST_MODE);
+	}
+
+	return false;
+}
+
+bool:GetWeaponSilen(const pWeapon)
+{
+	switch(WeaponIdType:get_member(pWeapon, m_iId))
+	{
+		case WEAPON_M4A1: return bool:(get_member(pWeapon, m_Weapon_iWeaponState) & WPNSTATE_M4A1_SILENCED);
+		case WEAPON_USP:  return bool:(get_member(pWeapon, m_Weapon_iWeaponState) & WPNSTATE_USP_SILENCED);
+	}
+
+	return false;
 }
 
 stock UTIL_RegisterClientCommandAll(const command[], function[], flags = -1, const info[] = "", FlagManager = -1, bool:info_ml = false)
