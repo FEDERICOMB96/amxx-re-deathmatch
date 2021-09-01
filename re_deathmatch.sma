@@ -8,13 +8,12 @@
 #pragma semicolon 1
 
 new const g_sPluginName[] = "DEATHMATCH";
-new const g_sPluginVersion[] = "v6";
+new const g_sPluginVersion[] = "v7";
 new const g_sPluginAuthor[] = "FEDERICOMB";
 
 new const g_sGlobalPrefix[] = "^4[DEATHMATCH]^1 ";
 
 #define MAX_USERS MAX_CLIENTS+1
-const MAX_CSDM_SPAWNS = 120;
 
 /// Player Vars
 new g_bConnected;
@@ -36,7 +35,6 @@ enum _:structWeaponData {
 new g_iWeaponData[MAX_USERS][structWeaponData];
 
 /// Global Vars
-new g_iSpawnCount;
 new g_iSyncHudDamage;
 new g_iGlobalMenuOne;
 new g_iGlobalMenuTwo;
@@ -44,10 +42,13 @@ new g_iGlobalMenuTwo;
 new bool:g_bAllowRandomSpawns = true;
 
 // SPAWNS
-new TeamName:g_iSpawnsTeam[MAX_CSDM_SPAWNS];
-
-new Float:g_fSpawns[MAX_CSDM_SPAWNS][3];
-new Float:g_fSpawnsAngles[MAX_CSDM_SPAWNS][3];
+enum _:ArraySpawns_e
+{
+	TeamName:SpawnTeam,
+	Float:SpawnOrigin[3],
+	Float:SpawnAngles[3],
+};
+new Array:g_aSpawns;
 
 // Cvars
 new g_iCSDM_OnlyHead;
@@ -155,6 +156,8 @@ public plugin_init()
 {
 	register_plugin(g_sPluginName, g_sPluginVersion, g_sPluginAuthor);
 
+	g_aSpawns = ArrayCreate(ArraySpawns_e);
+
 	loadSpawns();
 	loadMenus();
 
@@ -162,8 +165,6 @@ public plugin_init()
 	bind_pcvar_num(create_cvar("csdm_drop_medic", "0"), g_iCSDM_MedicKit);
 	bind_pcvar_num(get_cvar_pointer("mp_freeforall"), g_iCSDM_FreeForAll);
 	bind_pcvar_float(get_cvar_pointer("mp_item_staytime"), g_flCSDM_ItemStaytime);
-
-	register_concmd("csdm_reload_spawns", "ConsoleCommand__Spawns");
 
 	UTIL_RegisterClientCommandAll("guns", "ClientCommand__Weapons");
 	UTIL_RegisterClientCommandAll("armas", "ClientCommand__Weapons");
@@ -195,45 +196,33 @@ public plugin_end()
 {
 	if(g_iGlobalMenuOne) menu_destroy(g_iGlobalMenuOne);
 	if(g_iGlobalMenuTwo) menu_destroy(g_iGlobalMenuTwo);
+
+	if(g_aSpawns != Invalid_Array) ArrayDestroy(g_aSpawns);
 }
 
 loadSpawns()
 {
-	g_iSpawnCount = 0;
+	ArrayClear(g_aSpawns);
 
 	new const SPAWN_NAME_ENTS[][] = { "info_player_start", "info_player_deathmatch" };
-	new Float:vecOrigin[3];
-	new Float:vecAngles[3];
-	new iEnt;
-	new i;
 
-	for( i = 0; i < 2; ++i )
+	for(new i = 0, iEnt, aSpawn[ArraySpawns_e]; i < sizeof(SPAWN_NAME_ENTS); ++i)
 	{
 		iEnt = MAX_CLIENTS;
-		while( (iEnt = rg_find_ent_by_class(iEnt, SPAWN_NAME_ENTS[i])) > 0 )
+		while((iEnt = rg_find_ent_by_class(iEnt, SPAWN_NAME_ENTS[i])) > 0)
 		{
-			get_entvar(iEnt, var_origin, vecOrigin);
-			get_entvar(iEnt, var_angles, vecAngles);
+			get_entvar(iEnt, var_origin, aSpawn[SpawnOrigin]);
+			get_entvar(iEnt, var_angles, aSpawn[SpawnAngles]);
 
-			g_iSpawnsTeam[g_iSpawnCount] = (!i) ? TEAM_CT : TEAM_TERRORIST;
+			aSpawn[SpawnTeam] = (!i) ? TEAM_CT : TEAM_TERRORIST;
 
-			xs_vec_copy(vecOrigin, g_fSpawns[g_iSpawnCount]);
-			xs_vec_copy(vecAngles, g_fSpawnsAngles[g_iSpawnCount]);
-
-			if( ++g_iSpawnCount >= MAX_CSDM_SPAWNS )
-			{
-				break;
-			}
-		}
-		
-		if( g_iSpawnCount >= MAX_CSDM_SPAWNS )
-		{
-			break;
+			ArrayPushArray(g_aSpawns, aSpawn);
 		}
 	}
 
-	server_print("[CSDM] Spawns cargados: %d", g_iSpawnCount);
-	return g_iSpawnCount;
+	new iCount = ArraySize(g_aSpawns);
+	server_print("[CSDM] Spawns cargados: %d", iCount);
+	return iCount;
 }
 
 loadMenus()
@@ -286,16 +275,6 @@ public client_disconnected(id)
 /*************************************************************************************/
 /********************************* CLIENT COMMANDS  *********************************/
 /*************************************************************************************/
-public ConsoleCommand__Spawns(const id)
-{
-	if(~get_user_flags(id) & ADMIN_IMMUNITY)
-		return PLUGIN_HANDLED;
-
-	if(loadSpawns())
-		console_print(id, "[CSDM] Spawns recargados: %d total", g_iSpawnCount);
-
-	return PLUGIN_HANDLED;
-}
 
 public ClientCommand__Weapons(const id)
 {
@@ -388,7 +367,7 @@ public OnCBasePlayer_Killed(const this, pevAttacker, iGib)
 		}
 	}
 
-	if(get_member(this, m_bitsDamageType) == DMG_FALL
+	if(get_member(this, m_bitsDamageType) & DMG_FALL
 	|| (IsConnected(pevAttacker) && (GetCurrentWeapon(pevAttacker) == WEAPON_AWP || GetCurrentWeapon(pevAttacker) == WEAPON_SCOUT) && get_member(this, m_LastHitGroup) == HIT_HEAD))
 	{
 		SetHookChainArg(3, ATYPE_INTEGER, 2);
@@ -649,82 +628,83 @@ public message__SendAudio(const msgId, const destId, const id)
 /*************************************************************************************/
 public randomSpawn(const id)
 {
-	if( !g_iSpawnCount )
-	{
+	new iArraySize = ArraySize(g_aSpawns);
+	if(iArraySize < 1)
 		return;
-	}
 
-	new iHull;
-	new iSpawnId;
-	new TeamName:iTeam;
+	new iHull = (get_entvar(id, var_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN;
+	new iSpawnId = random_num(0, iArraySize - 1);
+	new TeamName:iTeam = GetUserTeam(id);
 	new iCount = 0;
 	new iSpawnPass = 0;
 	new iFinal = -1;
 	new i;
 
-	new Float:fOriginPlayer[MAX_USERS][3];
-	
-	iHull = (get_entvar(id, var_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN;
-	iSpawnId = random_num(0, g_iSpawnCount - 1);
-	iTeam = GetUserTeam(id);
+	new Float:vecOriginPlayer[MAX_USERS][3];
+	new Float:vecTemp[3];
+
+	new aSpawns[ArraySpawns_e];
 
 	for(i = 1; i <= MAX_CLIENTS; ++i)
 	{
-		if( !GetPlayerBit(g_bAlive, i) || i == id || (!g_iCSDM_FreeForAll && iTeam == GetUserTeam(i)) )
-		{
+		if(!GetPlayerBit(g_bAlive, i) || i == id || (!g_iCSDM_FreeForAll && iTeam == GetUserTeam(i)))
 			continue;
-		}
 
-		get_entvar(i, var_origin, fOriginPlayer[iCount++]);
+		get_entvar(i, var_origin, vecOriginPlayer[iCount++]);
 	}
 
-	while(iSpawnPass <= g_iSpawnCount) {
-		if(iSpawnPass == g_iSpawnCount) { // Paso por todos los spawns?
+	while(iSpawnPass <= iArraySize)
+	{
+		if(iSpawnPass == iArraySize) // Paso por todos los spawns?
 			break;
-		}
 
-		if(++iSpawnId >= g_iSpawnCount) {
+		if(++iSpawnId >= iArraySize)
 			iSpawnId = 0;
-		}
 
 		++iSpawnPass;
 
-		if(!g_iCSDM_FreeForAll && !g_bAllowRandomSpawns && iTeam != g_iSpawnsTeam[iSpawnId]) {
+		ArrayGetArray(g_aSpawns, iSpawnId, aSpawns);
+
+		if(!g_iCSDM_FreeForAll && !g_bAllowRandomSpawns && iTeam != aSpawns[SpawnTeam])
 			continue;
-		}
 
 		iFinal = iSpawnId;
+		xs_vec_copy(aSpawns[SpawnOrigin], vecTemp);
 
-		for(i = 0; i < iCount; ++i) {
-			if(get_distance_f(g_fSpawns[iSpawnId], fOriginPlayer[i]) < 500.0) {
+		for(i = 0; i < iCount; ++i)
+		{
+			if(get_distance_f(vecTemp, vecOriginPlayer[i]) < 500.0)
+			{
 				iFinal = -1;
 				break;
 			}
 		}
 
-		if(iFinal == -1) {
+		if(iFinal == -1)
 			continue;
-		}
 
-		if(!isHullVacant(g_fSpawns[iFinal], iHull)) {
+		ArrayGetArray(g_aSpawns, iFinal, aSpawns);
+		xs_vec_copy(aSpawns[SpawnOrigin], vecTemp);
+
+		if(!IsHullVacant(vecTemp, iHull))
 			continue;
-		}
 
-		if(iCount < 1) {
+		if(iCount < 1)
 			break;
-		}
 
-		if(iFinal != -1) {
+		if(iFinal != -1)
 			break;
-		}
 	}
 
-	if(iFinal != -1) {
+	if(iFinal != -1)
+	{
+		ArrayGetArray(g_aSpawns, iFinal, aSpawns);
+
 		set_entvar(id, var_fixangle, 1);
-		set_entvar(id, var_angles, g_fSpawnsAngles[iFinal]);
+		set_entvar(id, var_angles, aSpawns[SpawnAngles]);
 		set_entvar(id, var_fixangle, 1);
 		
-		set_entvar(id, var_origin, g_fSpawns[iFinal]);
+		set_entvar(id, var_origin, aSpawns[SpawnOrigin]);
 	}
 
 	set_task(0.25, "checkStuck", id);
@@ -732,34 +712,31 @@ public randomSpawn(const id)
 
 public checkStuck(const id)
 {
-	if( GetPlayerBit(g_bAlive, id) && isUserStuck(id) )
-	{
+	if(GetPlayerBit(g_bAlive, id) && IsUserStuck(id))
 		randomSpawn(id);
-	}
 }
 
-public isHullVacant(const Float:origin[3], const hull) {
+bool:IsHullVacant(const Float:origin[3], const hull)
+{
 	engfunc(EngFunc_TraceHull, origin, origin, 0, hull, 0, 0);
 	
-	if(!get_tr2(0, TR_StartSolid) && !get_tr2(0, TR_AllSolid) && get_tr2(0, TR_InOpen)) {
-		return 1;
-	}
+	if(!get_tr2(0, TR_StartSolid) && !get_tr2(0, TR_AllSolid) && get_tr2(0, TR_InOpen))
+		return true;
 	
-	return 0;
+	return false;
 }
 
-public isUserStuck(const id)
+bool:IsUserStuck(const id)
 {
 	new Float:vecOrigin[3];
 	get_entvar(id, var_origin, vecOrigin);
 	
 	engfunc(EngFunc_TraceHull, vecOrigin, vecOrigin, 0, (get_entvar(id, var_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN, id, 0);
 	
-	if(get_tr2(0, TR_StartSolid) || get_tr2(0, TR_AllSolid) || !get_tr2(0, TR_InOpen)) {
-		return 1;
-	}
+	if(get_tr2(0, TR_StartSolid) || get_tr2(0, TR_AllSolid) || !get_tr2(0, TR_InOpen))
+		return true;
 	
-	return 0;
+	return false;
 }
 
 public TeamName:GetUserTeam(const id)
