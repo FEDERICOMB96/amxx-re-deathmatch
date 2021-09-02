@@ -11,7 +11,7 @@
 * ============================================================================ */
 
 new const g_szPluginName[]     = "DEATHMATCH";
-new const g_szPluginVersion[]  = "v11";
+new const g_szPluginVersion[]  = "v13";
 new const g_szPluginAuthor[]   = "FEDERICOMB";
 new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1 ";
 
@@ -165,7 +165,7 @@ public plugin_init()
 {
 	register_plugin(g_szPluginName, g_szPluginVersion, g_szPluginAuthor);
 
-	g_aSpawns = ArrayCreate(ArraySpawns_e);
+	g_aSpawns = ArrayCreate(ArraySpawns_e, 1);
 
 	loadSpawns();
 	loadMenus();
@@ -234,19 +234,26 @@ loadSpawns()
 			g_bAllowRandomSpawns = json_object_get_bool(jSpawnsFile, "random_spawn");
 
 			new JSON:jArraySpawns = json_object_get_value(jSpawnsFile, "spawns");
-			for(new i = 0, aSpawn[ArraySpawns_e], JSON:jArrayValue, iCount = json_array_get_count(jArraySpawns); i < iCount; ++i)
+			for(new i = 0, aSpawn[ArraySpawns_e], szBuffer[21], szParse[3][7],
+				JSON:jArrayValue, iCount = json_array_get_count(jArraySpawns); i < iCount; ++i)
 			{
 				jArrayValue = json_array_get_value(jArraySpawns, i);
 
 				aSpawn[SpawnTeam] = TeamName:json_object_get_number(jArrayValue, "team");
 
-				aSpawn[SpawnOrigin][0] = json_object_get_real(jArrayValue, "origin.x", true);
-				aSpawn[SpawnOrigin][1] = json_object_get_real(jArrayValue, "origin.y", true);
-				aSpawn[SpawnOrigin][2] = json_object_get_real(jArrayValue, "origin.z", true);
+				json_object_get_string(jArrayValue, "origin", szBuffer, charsmax(szBuffer));
+				parse(szBuffer, szParse[0], charsmax(szParse[]), szParse[1], charsmax(szParse[]), szParse[2], charsmax(szParse[]));
 
-				aSpawn[SpawnAngles][0] = json_object_get_real(jArrayValue, "angles.x", true);
-				aSpawn[SpawnAngles][1] = json_object_get_real(jArrayValue, "angles.y", true);
-				aSpawn[SpawnAngles][2] = json_object_get_real(jArrayValue, "angles.z", true);
+				aSpawn[SpawnOrigin][0] = str_to_float(szParse[0]);
+				aSpawn[SpawnOrigin][1] = str_to_float(szParse[1]);
+				aSpawn[SpawnOrigin][2] = str_to_float(szParse[2]);
+
+				json_object_get_string(jArrayValue, "angles", szBuffer, charsmax(szBuffer));
+				parse(szBuffer, szParse[0], charsmax(szParse[]), szParse[1], charsmax(szParse[]), szParse[2], charsmax(szParse[]));
+
+				aSpawn[SpawnAngles][0] = str_to_float(szParse[0]);
+				aSpawn[SpawnAngles][1] = str_to_float(szParse[1]);
+				aSpawn[SpawnAngles][2] = str_to_float(szParse[2]);
 
 				ArrayPushArray(g_aSpawns, aSpawn);
 
@@ -910,20 +917,18 @@ SaveMapData(const id)
 
 		json_object_set_number(jObjetSpawn, "team", _:aSpawn[SpawnTeam]);
 
-		json_object_set_number(jObjetSpawn, "origin.x", floatround(aSpawn[SpawnOrigin][0]), true);
-		json_object_set_number(jObjetSpawn, "origin.y", floatround(aSpawn[SpawnOrigin][1]), true);
-		json_object_set_number(jObjetSpawn, "origin.z", floatround(aSpawn[SpawnOrigin][2]), true);
+		json_object_set_string(jObjetSpawn, "origin", 
+			fmt("%d %d %d", floatround(aSpawn[SpawnOrigin][0]), floatround(aSpawn[SpawnOrigin][1]), floatround(aSpawn[SpawnOrigin][2])));
 
-		json_object_set_number(jObjetSpawn, "angles.x", floatround(aSpawn[SpawnAngles][0]), true);
-		json_object_set_number(jObjetSpawn, "angles.y", floatround(aSpawn[SpawnAngles][1]), true);
-		json_object_set_number(jObjetSpawn, "angles.z", floatround(aSpawn[SpawnAngles][2]), true);
+		json_object_set_string(jObjetSpawn, "angles", 
+			fmt("%d %d %d", floatround(aSpawn[SpawnAngles][0]), floatround(aSpawn[SpawnAngles][1]), floatround(aSpawn[SpawnAngles][2])));
 
 		json_array_append_value(jArray, jObjetSpawn);
 	}
 
 	json_object_set_value(jRootValue, "spawns", jArray);
 	
-	if(json_serial_to_file(jRootValue, szFileName, false))
+	if(json_serial_to_file(jRootValue, szFileName, true))
 		client_print_color(id, print_team_default, "%sArchivo^4 %s^1 guardado correctamente!", g_szGlobalPrefix, szFileName);
 	else
 		client_print_color(id, print_team_default, "%sArchivo^4 %s^1 no guardado!", g_szGlobalPrefix, szFileName);
