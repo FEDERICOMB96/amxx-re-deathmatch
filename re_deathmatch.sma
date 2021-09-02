@@ -11,7 +11,7 @@
 * ============================================================================ */
 
 new const g_szPluginName[]     = "DEATHMATCH";
-new const g_szPluginVersion[]  = "v13";
+new const g_szPluginVersion[]  = "v14";
 new const g_szPluginAuthor[]   = "FEDERICOMB";
 new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1 ";
 
@@ -227,7 +227,7 @@ loadSpawns()
 	new JSON:jSpawnsFile = json_parse(szFileName, true, false);
 	if(jSpawnsFile != Invalid_JSON)
 	{
-		new JSON:jSchema = json_parse("{^"random_spawn^":false,^"spawns^":[{^"team^":0,^"origin^":{^"x^":0,^"y^":0,^"z^":0},^"angles^":{^"x^":0,^"y^":0,^"z^":0}}]}", false, false);
+		new JSON:jSchema = json_parse("{^"random_spawn^":false,^"spawns^":[{^"team^":0,^"origin^":^"^",^"angles^":^"^"}]}", false, false);
 
 		if(json_validate(jSchema, jSpawnsFile))
 		{
