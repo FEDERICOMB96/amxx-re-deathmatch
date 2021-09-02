@@ -3,6 +3,7 @@
 #include <cstrike>
 #include <engine>
 #include <fakemeta>
+#include <json>
 #include <xs>
 
 /* ===========================================================================
@@ -10,7 +11,7 @@
 * ============================================================================ */
 
 new const g_szPluginName[]     = "DEATHMATCH";
-new const g_szPluginVersion[]  = "v8";
+new const g_szPluginVersion[]  = "v11";
 new const g_szPluginAuthor[]   = "FEDERICOMB";
 new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1 ";
 
@@ -40,6 +41,7 @@ new g_iGlobalMenuOne;
 new g_iGlobalMenuTwo;
 
 new bool:g_bAllowRandomSpawns = true;
+new bool:g_bShowingSpawns = false;
 
 enum _:ArraySpawns_e
 {
@@ -96,17 +98,20 @@ new const SECONDARY_WEAPONS[][e_StructWeapons] =
 	{WEAPON_FIVESEVEN,  "weapon_fiveseven", "Five SeveN",           false}
 };
 
-new const CLASSNAME_ENT_MEDKIT[]        = "entMedKit";
+new const g_szCustomSpawnModels[][] =
+{
+	"",
+	"models/player/terror/terror.mdl",
+	"models/player/gign/gign.mdl",
+	""
+};
 
-#define IsPlayer(%0)                    ( 1 <= %0 <= MAX_CLIENTS )
+new const g_szInfoTargetClass[]         = "info_target";
+new const g_szCustomSpawnClass[]        = "CustomSpawn";
 
-#define GetPlayerBit(%0,%1)             ( IsPlayer(%1) && ( %0 & ( 1 << ( %1 & 31 ) ) ) )
-#define SetPlayerBit(%0,%1)             ( IsPlayer(%1) && ( %0 |= ( 1 << ( %1 & 31 ) ) ) )
-#define ClearPlayerBit(%0,%1)           ( IsPlayer(%1) && ( %0 &= ~( 1 << ( %1 & 31 ) ) ) )
-#define SwitchPlayerBit(%0,%1)          ( IsPlayer(%1) && ( %0 ^= ( 1 << ( %1 & 31 ) ) ) )
-
-#define IsConnected(%0)                 GetPlayerBit(g_bConnected, %0)
-#define IsAlive(%0)                     GetPlayerBit(g_bAlive, %0)
+new const g_szMedKitClass[]             = "MedKit";
+new const g_szModel_MedicKit[]          = "models/w_medkit.mdl";
+new const g_szSound_MedicKit[]          = "items/smallmedkit1.wav";
 
 new const OBJECTIVES_ENTITIES[][] =
 {
@@ -128,8 +133,15 @@ new const SENDAUDIO_BLOCK[][] =
 	"%!MRAD_BOMBPL", "%!MRAD_BOMBDEF", "%!MRAD_rescued"
 };
 
-new const g_sModel_MedicKit[] = "models/w_medkit.mdl";
-new const g_sSound_MedicKit[] = "items/smallmedkit1.wav";
+#define IsPlayer(%0)                    (1 <= %0 <= MAX_CLIENTS)
+
+#define GetPlayerBit(%0,%1)             (IsPlayer(%1) && (%0 & (1 << (%1 & 31))))
+#define SetPlayerBit(%0,%1)             (IsPlayer(%1) && (%0 |= (1 << (%1 & 31))))
+#define ClearPlayerBit(%0,%1)           (IsPlayer(%1) && (%0 &= ~(1 << (%1 & 31))))
+#define SwitchPlayerBit(%0,%1)          (IsPlayer(%1) && (%0 ^= (1 << (%1 & 31))))
+
+#define IsConnected(%0)                 GetPlayerBit(g_bConnected, %0)
+#define IsAlive(%0)                     GetPlayerBit(g_bAlive, %0)
 
 /* =================================================================================
 * 				[ Plugin events ]
@@ -145,8 +157,8 @@ public plugin_precache()
 
 	g_Forward_Spawn = register_forward(FM_Spawn, "OnFw__Spawn");
 
-	precache_model(g_sModel_MedicKit);
-	precache_sound(g_sSound_MedicKit);
+	precache_model(g_szModel_MedicKit);
+	precache_sound(g_szSound_MedicKit);
 }
 
 public plugin_init()
@@ -177,6 +189,8 @@ public plugin_init()
 
 	set_msg_block(get_user_msgid("Radar"), BLOCK_SET);
 
+	UTIL_RegisterClientCommandAll("manage", "ClientCommand__Manage");
+	UTIL_RegisterClientCommandAll("configurar", "ClientCommand__Manage");
 	UTIL_RegisterClientCommandAll("guns", "ClientCommand__Weapons");
 	UTIL_RegisterClientCommandAll("armas", "ClientCommand__Weapons");
 
@@ -205,19 +219,63 @@ loadSpawns()
 {
 	ArrayClear(g_aSpawns);
 
-	new const SPAWN_NAME_ENTS[][] = { "info_player_start", "info_player_deathmatch" };
+	new szMap[64], szFileName[PLATFORM_MAX_PATH];
+	get_localinfo("amxx_datadir", szFileName, PLATFORM_MAX_PATH-1);
+	get_mapname(szMap, charsmax(szMap)); mb_strtolower(szMap);
+	add(szFileName, PLATFORM_MAX_PATH-1, fmt("/re_dm/%s.dat", szMap));
 
-	for(new i = 0, iEnt, aSpawn[ArraySpawns_e]; i < sizeof(SPAWN_NAME_ENTS); ++i)
+	new JSON:jSpawnsFile = json_parse(szFileName, true, false);
+	if(jSpawnsFile != Invalid_JSON)
 	{
-		iEnt = MAX_CLIENTS;
-		while((iEnt = rg_find_ent_by_class(iEnt, SPAWN_NAME_ENTS[i])) > 0)
+		new JSON:jSchema = json_parse("{^"random_spawn^":false,^"spawns^":[{^"team^":0,^"origin^":{^"x^":0,^"y^":0,^"z^":0},^"angles^":{^"x^":0,^"y^":0,^"z^":0}}]}", false, false);
+
+		if(json_validate(jSchema, jSpawnsFile))
 		{
-			get_entvar(iEnt, var_origin, aSpawn[SpawnOrigin]);
-			get_entvar(iEnt, var_angles, aSpawn[SpawnAngles]);
+			g_bAllowRandomSpawns = json_object_get_bool(jSpawnsFile, "random_spawn");
 
-			aSpawn[SpawnTeam] = (!i) ? TEAM_CT : TEAM_TERRORIST;
+			new JSON:jArraySpawns = json_object_get_value(jSpawnsFile, "spawns");
+			for(new i = 0, aSpawn[ArraySpawns_e], JSON:jArrayValue, iCount = json_array_get_count(jArraySpawns); i < iCount; ++i)
+			{
+				jArrayValue = json_array_get_value(jArraySpawns, i);
 
-			ArrayPushArray(g_aSpawns, aSpawn);
+				aSpawn[SpawnTeam] = TeamName:json_object_get_number(jArrayValue, "team");
+
+				aSpawn[SpawnOrigin][0] = json_object_get_real(jArrayValue, "origin.x", true);
+				aSpawn[SpawnOrigin][1] = json_object_get_real(jArrayValue, "origin.y", true);
+				aSpawn[SpawnOrigin][2] = json_object_get_real(jArrayValue, "origin.z", true);
+
+				aSpawn[SpawnAngles][0] = json_object_get_real(jArrayValue, "angles.x", true);
+				aSpawn[SpawnAngles][1] = json_object_get_real(jArrayValue, "angles.y", true);
+				aSpawn[SpawnAngles][2] = json_object_get_real(jArrayValue, "angles.z", true);
+
+				ArrayPushArray(g_aSpawns, aSpawn);
+
+				json_free(jArrayValue);
+			}
+
+			json_free(jArraySpawns);
+		}
+
+		json_free(jSchema);
+		json_free(jSpawnsFile);
+	}
+
+	if(ArraySize(g_aSpawns) < 1)
+	{
+		new const SPAWN_NAME_ENTS[][] = { "info_player_start", "info_player_deathmatch" };
+
+		for(new i = 0, iEnt, aSpawn[ArraySpawns_e]; i < sizeof(SPAWN_NAME_ENTS); ++i)
+		{
+			iEnt = MAX_CLIENTS;
+			while((iEnt = rg_find_ent_by_class(iEnt, SPAWN_NAME_ENTS[i])) > 0)
+			{
+				get_entvar(iEnt, var_origin, aSpawn[SpawnOrigin]);
+				get_entvar(iEnt, var_angles, aSpawn[SpawnAngles]);
+
+				aSpawn[SpawnTeam] = (!i) ? TEAM_CT : TEAM_TERRORIST;
+
+				ArrayPushArray(g_aSpawns, aSpawn);
+			}
 		}
 	}
 
@@ -293,7 +351,7 @@ public OnCBasePlayer_Killed(const this, pevAttacker, iGib)
 
 	new WeaponIdType:iWid;
 
-	if( PRIMARY_WEAPONS[g_iPrimaryWeapons[this]][weaponSilenced] )
+	if(PRIMARY_WEAPONS[g_iPrimaryWeapons[this]][weaponSilenced])
 	{
 		iWid = PRIMARY_WEAPONS[g_iPrimaryWeapons[this]][weaponId];
 
@@ -330,7 +388,7 @@ public OnCBasePlayer_Killed(const this, pevAttacker, iGib)
 	if(pevAttacker == this || !IsConnected(pevAttacker))
 		return HC_CONTINUE;
 
-	if(GetPlayerBit(g_bAlive, pevAttacker))
+	if(IsAlive(pevAttacker))
 		cs_set_user_armor(pevAttacker, 100, CS_ARMOR_VESTHELM);
 
 	if(g_iCSDM_MedicKit)
@@ -460,7 +518,7 @@ loadMenus()
 
 public OnTaskShowMenuWeapons(const id)
 {
-	if(!GetPlayerBit(g_bAlive, id))
+	if(!IsAlive(id))
 		return;
 
 	if(g_iDontShowTheMenuAgain[id])
@@ -471,7 +529,7 @@ public OnTaskShowMenuWeapons(const id)
 		return;
 	}
 
-	new iMenuId = menu_create(fmt("\y%s : Equipamiento", g_szPluginName, g_szPluginAuthor), "menu__Equip");
+	new iMenuId = menu_create(fmt("\y%s : Equipamiento", g_szPluginName), "menu__Equip");
 
 	menu_additem(iMenuId, "Armas Nuevas");
 	menu_additem(iMenuId, "Selección Anterior");
@@ -490,7 +548,7 @@ public menu__Equip(const id, const menuid, const itemid)
 {
 	menu_destroy(menuid);
 
-	if(!GetPlayerBit(g_bAlive, id))
+	if(!IsAlive(id))
 		return PLUGIN_HANDLED;
 
 	switch(itemid)
@@ -519,7 +577,7 @@ public menu__Equip(const id, const menuid, const itemid)
 
 showMenu__Weapons(const id, const weapons)
 {
-	if(!GetPlayerBit(g_bAlive, id))
+	if(!IsAlive(id))
 		return;
 
 	switch(weapons)
@@ -531,7 +589,7 @@ showMenu__Weapons(const id, const weapons)
 
 public menu__PrimaryWeapons(const id, const menuid, const itemid)
 {
-	if(!GetPlayerBit(g_bAlive, id) || itemid == MENU_EXIT)
+	if(!IsAlive(id) || itemid == MENU_EXIT)
 		return PLUGIN_HANDLED;
 
 	g_iPrimaryWeapons[id] = itemid;
@@ -542,7 +600,7 @@ public menu__PrimaryWeapons(const id, const menuid, const itemid)
 
 public menu__SecondaryWeapons(const id, const menuid, const itemid)
 {
-	if(!GetPlayerBit(g_bAlive, id) || itemid == MENU_EXIT)
+	if(!IsAlive(id) || itemid == MENU_EXIT)
 		return PLUGIN_HANDLED;
 
 	g_iSecondaryWeapons[id] = itemid;
@@ -554,7 +612,7 @@ public menu__SecondaryWeapons(const id, const menuid, const itemid)
 
 public giveWeapons(const id, const weapon)
 {
-	if(!GetPlayerBit(g_bAlive, id))
+	if(!IsAlive(id))
 		return;
 
 	switch(weapon)
@@ -599,12 +657,115 @@ public giveWeapons(const id, const weapon)
 	}
 }
 
+ShowMenu_Management(const id)
+{
+	new iSpawnsCount = ArraySize(g_aSpawns);
+	new iCt = 0, iT = 0;
+
+	for(new i = 0, aSpawn[ArraySpawns_e]; i < iSpawnsCount; i++)
+	{
+		ArrayGetArray(g_aSpawns, i, aSpawn);
+
+		if(aSpawn[SpawnTeam] == TEAM_CT)
+			++iCt;
+		else if(aSpawn[SpawnTeam] == TEAM_TERRORIST)
+			++iT;
+	}
+
+	new iMenuId = menu_create(fmt("\y%s : Configuración^n\dCT: [ %d ] | T: [ %d ] | Total: [ %d ]", g_szPluginName, iCt, iT, iSpawnsCount), "menu_Management");
+
+	menu_additem(iMenuId, fmt("Tipo de spawn\y %s^n", g_bAllowRandomSpawns ? "Aleatorio" : "Por equipo"));
+	
+	menu_additem(iMenuId, "Crear spawn\y Anti Terrorista");
+	menu_additem(iMenuId, "Crear spawn\y Terrorista^n");
+	
+	menu_additem(iMenuId, "Borrar spawn\y Apuntado");
+	menu_additem(iMenuId, "Borrar spawns\y del Mapa^n");
+	
+	menu_additem(iMenuId, "\yGuardar^n");
+	
+	menu_additem(iMenuId, "Salir");
+	
+	menu_setprop(iMenuId, MPROP_EXIT, MEXIT_NEVER);
+	menu_setprop(iMenuId, MPROP_PERPAGE, 0);
+	
+	menu_display(id, iMenuId);
+}
+
+public menu_Management(const id, const menuid, const itemid)
+{
+	menu_destroy(menuid);
+
+	if(!IsConnected(id) || itemid == MENU_EXIT || itemid > 5)
+	{
+		HideCustomSpawns();
+		return PLUGIN_HANDLED;
+	}
+
+	switch(itemid)
+	{
+		case 0:
+		{
+			#emit LOAD.pri g_bAllowRandomSpawns
+			#emit NOT
+			#emit STOR.pri g_bAllowRandomSpawns
+		}
+		case 1, 2:
+		{
+			new aSpawn[ArraySpawns_e];
+
+			get_entvar(id, var_origin, aSpawn[SpawnOrigin]);
+			get_entvar(id, var_v_angle, aSpawn[SpawnAngles]);
+
+			aSpawn[SpawnTeam] = (itemid == 1) ? TEAM_CT : TEAM_TERRORIST;
+
+			ArrayPushArray(g_aSpawns, aSpawn);
+		}
+		case 3:
+		{
+			new iEnt = FindCustomSpawn(id);
+			
+			if(iEnt > 0)
+			{
+				new iItem = get_entvar(iEnt, var_iuser1);
+				
+				set_entvar(iEnt, var_modelindex, 0);
+				set_entvar(iEnt, var_flags, FL_KILLME);
+				
+				ArrayDeleteItem(g_aSpawns, iItem);
+			}
+		}
+		case 4: ArrayClear(g_aSpawns);
+		case 5: SaveMapData(id);
+	}
+	
+	HideCustomSpawns();
+	ShowCustomSpawns();
+	
+	ShowMenu_Management(id);
+	return PLUGIN_HANDLED;
+}
+
 /* ===========================================================================
 * 				[ Client Commands ]
 * ============================================================================ */
 
+public ClientCommand__Manage(const id)
+{
+	if(!IsConnected(id) || ~get_user_flags(id) & ADMIN_IMMUNITY)
+		return PLUGIN_HANDLED;
+
+	ShowCustomSpawns();
+	
+	ShowMenu_Management(id);
+	return PLUGIN_HANDLED;
+}
+
 public ClientCommand__Weapons(const id)
 {
+	if(!IsConnected(id))
+		return PLUGIN_HANDLED;
+
 	if(!g_iDontShowTheMenuAgain[id])
 	{
 		OnTaskShowMenuWeapons(id);
@@ -615,6 +776,161 @@ public ClientCommand__Weapons(const id)
 	client_print_color(id, print_team_default, "%sEn tu próxima regeneración podrás seleccionar nuevas armas!", g_szGlobalPrefix);
 
 	return PLUGIN_HANDLED;
+}
+
+/* =================================================================================
+* 				[ Show Spawns While Editing ]
+* ================================================================================= */
+
+CreateCustomSpawn(const i, const TeamName:iTeam, const Float:vecOrigin[3], const Float:vecAngles[3])
+{
+	new iEnt = rg_create_entity(g_szInfoTargetClass);
+	
+	if(!is_valid_ent(iEnt))
+		return 0;
+	
+	set_entvar(iEnt, var_classname, g_szCustomSpawnClass);
+	
+	entity_set_model(iEnt, g_szCustomSpawnModels[_:iTeam]);
+	entity_set_size(iEnt, Float:{-16.0, -16.0, -36.0}, Float:{16.0, 16.0, 36.0});
+	
+	entity_set_origin(iEnt, vecOrigin);
+	set_entvar(iEnt, var_angles, vecAngles);
+	
+	set_entvar(iEnt, var_solid, SOLID_TRIGGER);
+	set_entvar(iEnt, var_movetype, MOVETYPE_FLY);
+	
+	set_entvar(iEnt, var_sequence, 1);
+	set_entvar(iEnt, var_weaponanim, 1);
+	
+	set_entvar(iEnt, var_animtime, get_gametime());
+	set_entvar(iEnt, var_framerate, 1.0);
+	set_entvar(iEnt, var_frame, 0.0);
+	
+	set_entvar(iEnt, var_controller, 125, 0);
+	set_entvar(iEnt, var_controller, 125, 1);
+	set_entvar(iEnt, var_controller, 125, 2);
+	set_entvar(iEnt, var_controller, 125, 3);
+
+	set_entvar(iEnt, var_iuser1, i);
+	
+	return iEnt;
+}
+
+FindCustomSpawn(const id)
+{
+	new Float:vecOrigin[3];
+	new Float:vecEnd[3];
+	new Float:vecStart[3];
+	new Float:vecViewOfs[3];
+	new Float:vecAngles[3];
+
+	get_entvar(id, var_origin, vecOrigin);
+	get_entvar(id, var_view_ofs, vecViewOfs);
+	get_entvar(id, var_v_angle, vecAngles);
+
+	xs_vec_add(vecOrigin, vecViewOfs, vecStart);
+
+	angle_vector(vecAngles, ANGLEVECTOR_FORWARD, vecAngles);
+
+	xs_vec_mul_scalar(vecAngles, 2048.0, vecAngles);
+	xs_vec_add(vecStart, vecAngles, vecEnd);
+
+	new iEnt = 0;
+	while((iEnt = rg_find_ent_by_class(iEnt, g_szCustomSpawnClass)) > 0)
+	{
+		engfunc(EngFunc_TraceModel, vecStart, vecEnd, HULL_POINT, iEnt, 0);
+		
+		if(get_tr2(0, TR_pHit) == iEnt)
+			return iEnt;
+	}
+
+	return 0;
+}
+
+ShowCustomSpawns()
+{
+	if(g_bShowingSpawns)
+		return;
+	
+	g_bShowingSpawns = true;
+
+	for(new i = 0, Float:vecOrigin[3], Float:vecAngles[3],
+		aSpawn[ArraySpawns_e], iSpawnsCount = ArraySize(g_aSpawns); i < iSpawnsCount; i++)
+	{
+		ArrayGetArray(g_aSpawns, i, aSpawn);
+		
+		xs_vec_copy(aSpawn[SpawnOrigin], vecOrigin);
+		vecAngles[1] = aSpawn[SpawnAngles][1];
+		
+		CreateCustomSpawn(i, aSpawn[SpawnTeam], vecOrigin, vecAngles);
+	}
+}
+
+HideCustomSpawns()
+{
+	if(!g_bShowingSpawns)
+		return;
+	
+	g_bShowingSpawns = false;
+	
+	new iEnt = 0;
+	while((iEnt = rg_find_ent_by_class(iEnt, g_szCustomSpawnClass)) > 0)
+	{
+		set_entvar(iEnt, var_modelindex, 0);
+		set_entvar(iEnt, var_flags, FL_KILLME);
+	}
+}
+
+SaveMapData(const id)
+{
+	new szDir[PLATFORM_MAX_PATH];
+	get_localinfo("amxx_datadir", szDir, PLATFORM_MAX_PATH-1);
+	add(szDir, PLATFORM_MAX_PATH-1, "/re_dm");
+
+	if(!dir_exists(szDir))
+		mkdir(szDir);
+
+	new szMap[64], szFileName[PLATFORM_MAX_PATH];
+	get_mapname(szMap, charsmax(szMap)); mb_strtolower(szMap);
+	formatex(szFileName, PLATFORM_MAX_PATH-1, "%s/%s.dat", szDir, szMap);
+
+	new JSON:jRootValue = json_init_object();
+
+	json_object_set_bool(jRootValue, "random_spawn", g_bAllowRandomSpawns);
+
+	new JSON:jArray = json_init_array();
+	new JSON:jObjetSpawn = json_init_object();
+
+	for(new i = 0, aSpawn[ArraySpawns_e], iSpawnsCount = ArraySize(g_aSpawns); i < iSpawnsCount; i++)
+	{
+		ArrayGetArray(g_aSpawns, i, aSpawn);
+
+		json_object_clear(jObjetSpawn);
+
+		json_object_set_number(jObjetSpawn, "team", _:aSpawn[SpawnTeam]);
+
+		json_object_set_number(jObjetSpawn, "origin.x", floatround(aSpawn[SpawnOrigin][0]), true);
+		json_object_set_number(jObjetSpawn, "origin.y", floatround(aSpawn[SpawnOrigin][1]), true);
+		json_object_set_number(jObjetSpawn, "origin.z", floatround(aSpawn[SpawnOrigin][2]), true);
+
+		json_object_set_number(jObjetSpawn, "angles.x", floatround(aSpawn[SpawnAngles][0]), true);
+		json_object_set_number(jObjetSpawn, "angles.y", floatround(aSpawn[SpawnAngles][1]), true);
+		json_object_set_number(jObjetSpawn, "angles.z", floatround(aSpawn[SpawnAngles][2]), true);
+
+		json_array_append_value(jArray, jObjetSpawn);
+	}
+
+	json_object_set_value(jRootValue, "spawns", jArray);
+	
+	if(json_serial_to_file(jRootValue, szFileName, false))
+		client_print_color(id, print_team_default, "%sArchivo^4 %s^1 guardado correctamente!", g_szGlobalPrefix, szFileName);
+	else
+		client_print_color(id, print_team_default, "%sArchivo^4 %s^1 no guardado!", g_szGlobalPrefix, szFileName);
+
+	json_free(jObjetSpawn);
+	json_free(jArray);
+	json_free(jRootValue);
 }
 
 /* ===========================================================================
@@ -642,7 +958,7 @@ public randomSpawn(const id)
 
 	for(i = 1; i <= MAX_CLIENTS; ++i)
 	{
-		if(!GetPlayerBit(g_bAlive, i) || i == id || (!g_iCSDM_FreeForAll && iTeam == GetUserTeam(i)))
+		if(!IsAlive(i) || i == id || (!g_iCSDM_FreeForAll && iTeam == GetUserTeam(i)))
 			continue;
 
 		get_entvar(i, var_origin, vecOriginPlayer[iCount++]);
@@ -707,7 +1023,7 @@ public randomSpawn(const id)
 
 public checkStuck(const id)
 {
-	if(GetPlayerBit(g_bAlive, id) && IsUserStuck(id))
+	if(IsAlive(id) && IsUserStuck(id))
 		randomSpawn(id);
 }
 
@@ -758,8 +1074,8 @@ DropMedKit(const id)
 		new Float:vecVelocity[3];
 		new Float:vecOrigin[3];
 		
-		set_entvar(iEnt, var_classname, CLASSNAME_ENT_MEDKIT);
-		entity_set_model(iEnt, g_sModel_MedicKit);
+		set_entvar(iEnt, var_classname, g_szMedKitClass);
+		entity_set_model(iEnt, g_szModel_MedicKit);
 		entity_set_size(iEnt, Float:{-23.16, -13.66, 0.0}, Float:{11.47, 12.78, 6.72});
 		
 		set_entvar(iEnt, var_solid, SOLID_TRIGGER);
@@ -793,7 +1109,7 @@ public OnTouch_MedicKit(const medickit, const id)
 	{
 		set_entvar(id, var_health, floatmin((flHealth + 15.0), 100.0));
 		
-		rh_emit_sound2(id, 0, CHAN_ITEM, g_sSound_MedicKit);
+		rh_emit_sound2(id, 0, CHAN_ITEM, g_szSound_MedicKit);
 		
 		SetTouch(medickit, "");
 		SetThink(medickit, "");
