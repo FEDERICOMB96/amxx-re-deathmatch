@@ -19,3 +19,9 @@ En el archivo [dm_game.cfg](https://github.com/FEDERICOMB96/amxx-re-deathmatch/b
 | :---------------------------------- | :-----: | :-: | :----------: | :--------------------------------------------- |
 | csdm_only_head                      | 0       | 0   | 1            | Jugar en modo "only head"                      |
 | csdm_drop_medic                     | 0       | 0   | 1            | Dropea un kit médico al matar un enemigo que al recogerlo otorga 15 de vida extra |
+
+## Comandos por say / say_team
+| Comando                             | Descripción                                    |
+| :---------------------------------- | :--------------------------------------------- |
+| manage / configurar                 | Abre el menú de editor de spawns de mapa actual |
+| guns / armas                        | Abre el menú de selección de armas             |
