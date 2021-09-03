@@ -11,9 +11,9 @@
 * ============================================================================ */
 
 new const g_szPluginName[]     = "DEATHMATCH";
-new const g_szPluginVersion[]  = "v14";
+new const g_szPluginVersion[]  = "v18";
 new const g_szPluginAuthor[]   = "FEDERICOMB";
-new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1 ";
+new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1";
 
 #define MAX_USERS              MAX_CLIENTS+1
 
@@ -37,8 +37,6 @@ enum _:structWeaponData
 new g_iWeaponData[MAX_USERS][structWeaponData];
 
 new g_iSyncHudDamage;
-new g_iGlobalMenuOne;
-new g_iGlobalMenuTwo;
 
 new bool:g_bAllowRandomSpawns = true;
 new bool:g_bShowingSpawns = false;
@@ -168,7 +166,6 @@ public plugin_init()
 	g_aSpawns = ArrayCreate(ArraySpawns_e, 1);
 
 	loadSpawns();
-	loadMenus();
 
 	bind_pcvar_num(create_cvar("csdm_only_head", "0"), g_iCSDM_OnlyHead);
 	bind_pcvar_num(create_cvar("csdm_drop_medic", "0"), g_iCSDM_MedicKit);
@@ -195,6 +192,8 @@ public plugin_init()
 	UTIL_RegisterClientCommandAll("armas", "ClientCommand__Weapons");
 
 	g_iSyncHudDamage = CreateHudSyncObj();
+
+	register_dictionary("re_dm.txt");
 }
 
 public OnConfigsExecuted()
@@ -205,9 +204,6 @@ public OnConfigsExecuted()
 
 public plugin_end()
 {
-	if(g_iGlobalMenuOne) menu_destroy(g_iGlobalMenuOne);
-	if(g_iGlobalMenuTwo) menu_destroy(g_iGlobalMenuTwo);
-
 	if(g_aSpawns != Invalid_Array) ArrayDestroy(g_aSpawns);
 }
 
@@ -287,7 +283,7 @@ loadSpawns()
 	}
 
 	new iCount = ArraySize(g_aSpawns);
-	server_print("[CSDM] Spawns cargados: %d", iCount);
+	server_print("[ReDM] %L", LANG_SERVER, "SERVER_INFO_SPAWNS_LOADED", iCount);
 	return iCount;
 }
 
@@ -341,7 +337,7 @@ public OnCBasePlayer_TraceAttack(const this, pevAttacker, Float:flDamage, Float:
 		if(iHitGroup != HIT_HEAD)
 		{
 			set_hudmessage(255, 255, 0, -1.0, 0.57, 0, 0.0, 1.0, 0.0, 0.4, 2);
-			ShowSyncHudMsg(pevAttacker, g_iSyncHudDamage, "¡APUNTA A LA CABEZA!");
+			ShowSyncHudMsg(pevAttacker, g_iSyncHudDamage, "%L", pevAttacker, "HUD_INFO_ONLYHEAD");
 
 			return HC_SUPERCEDE;
 		}
@@ -496,33 +492,6 @@ public message__SendAudio(const msgId, const destId, const id)
 * 				[ Client Menus ]
 * ============================================================================ */
 
-loadMenus()
-{
-	// Primary Weapons
-	{
-		g_iGlobalMenuOne = menu_create(fmt("\y%s :\w Armas primarias\R\y", g_szPluginName), "menu__PrimaryWeapons");
-
-		for(new i = 0; i < sizeof(PRIMARY_WEAPONS); ++i)
-			menu_additem(g_iGlobalMenuOne, PRIMARY_WEAPONS[i][weaponNames]);
-
-		menu_setprop(g_iGlobalMenuOne, MPROP_NEXTNAME, "Página siguiente");
-		menu_setprop(g_iGlobalMenuOne, MPROP_BACKNAME, "Página anterior");
-		menu_setprop(g_iGlobalMenuOne, MPROP_EXITNAME, "Salir");
-	}
-
-	// Secondary Weapons
-	{
-		g_iGlobalMenuTwo = menu_create(fmt("\y%s :\w Armas secundarias\R\y", g_szPluginName), "menu__SecondaryWeapons");
-
-		for(new i = 0; i < sizeof(SECONDARY_WEAPONS); ++i)
-			menu_additem(g_iGlobalMenuTwo, SECONDARY_WEAPONS[i][weaponNames]);
-
-		menu_setprop(g_iGlobalMenuTwo, MPROP_NEXTNAME, "Página siguiente");
-		menu_setprop(g_iGlobalMenuTwo, MPROP_BACKNAME, "Página anterior");
-		menu_setprop(g_iGlobalMenuTwo, MPROP_EXITNAME, "Salir");
-	}
-}
-
 public OnTaskShowMenuWeapons(const id)
 {
 	if(!IsAlive(id))
@@ -530,21 +499,21 @@ public OnTaskShowMenuWeapons(const id)
 
 	if(g_iDontShowTheMenuAgain[id])
 	{
-		giveWeapons(id, 1);
-		giveWeapons(id, 2);
+		GiveWeapons(id, true);
+		GiveWeapons(id, false);
 
 		return;
 	}
 
-	new iMenuId = menu_create(fmt("\y%s : Equipamiento", g_szPluginName), "menu__Equip");
+	new iMenuId = menu_create(fmt("\y%s : %L", g_szPluginName, id, "MENU_TITLE_EQUIPMENT"), "menu__Equip");
 
-	menu_additem(iMenuId, "Armas Nuevas");
-	menu_additem(iMenuId, "Selección Anterior");
-	menu_additem(iMenuId, "2 + No mostrar más el Menú");
+	menu_additem(iMenuId, fmt("%L", id, "MENU_NEW_WEAPONS"));
+	menu_additem(iMenuId, fmt("%L", id, "MENU_PREV_SELECTION"));
+	menu_additem(iMenuId, fmt("%L", id, "MENU_PREV_DONT_SHOW_AGAIN"));
 
 	menu_addblank(iMenuId);
-	menu_addtext(iMenuId, fmt("\wArma primaria\r:\y %s", PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponNames]));
-	menu_addtext(iMenuId, fmt("\wArma secundaria\r:\y %s", SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponNames]));
+	menu_addtext(iMenuId, fmt("%L\r:\y %s", id, "MENU_INFO_PRIMARY", PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponNames]));
+	menu_addtext(iMenuId, fmt("%L\r:\y %s", id, "MENU_INFO_SECONDARY", SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponNames]));
 
 	menu_setprop(iMenuId, MPROP_EXIT, MEXIT_NEVER);
 
@@ -560,105 +529,119 @@ public menu__Equip(const id, const menuid, const itemid)
 
 	switch(itemid)
 	{
-		case 0: showMenu__Weapons(id, 2);
+		case 0: showMenu__Weapons(id, false);
 
 		case 1:
 		{
-			giveWeapons(id, 1);
-			giveWeapons(id, 2);
+			GiveWeapons(id, true);
+			GiveWeapons(id, false);
 		}
 
 		case 2:
 		{
 			g_iDontShowTheMenuAgain[id] = 1;
 
-			giveWeapons(id, 1);
-			giveWeapons(id, 2);
+			GiveWeapons(id, true);
+			GiveWeapons(id, false);
 
-			client_print_color(id, print_team_default, "%sEscribe^4 guns^1 para activar nuevamente el menú de armamento", g_szGlobalPrefix);
+			client_print_color(id, print_team_default, "%s %L", g_szGlobalPrefix, id, "CHAT_TYPE_GUNS");
 		}
 	}
 
 	return PLUGIN_HANDLED;
 }
 
-showMenu__Weapons(const id, const weapons)
+showMenu__Weapons(const id, const bool:bPrimary)
 {
 	if(!IsAlive(id))
 		return;
 
-	switch(weapons)
+	new iMenuId = menu_create(fmt("\y%s :\w %L\R\y", g_szPluginName, id, bPrimary ? "MENU_TITLE_PRIMARY" : "MENU_TITLE_SECONDARY"), 
+		bPrimary ? "menu__PrimaryWeapons" : "menu__SecondaryWeapons");
+
+	if(bPrimary)
 	{
-		case 1: menu_display(id, g_iGlobalMenuOne, 0);
-		case 2: menu_display(id, g_iGlobalMenuTwo, 0);
+		for(new i = 0; i < sizeof(PRIMARY_WEAPONS); ++i)
+			menu_additem(iMenuId, PRIMARY_WEAPONS[i][weaponNames]);
 	}
+	else
+	{
+		for(new i = 0; i < sizeof(SECONDARY_WEAPONS); ++i)
+			menu_additem(iMenuId, SECONDARY_WEAPONS[i][weaponNames]);
+	}
+
+	menu_setprop(iMenuId, MPROP_NEXTNAME, fmt("%L", id, "MENU_OPT_NEXT"));
+	menu_setprop(iMenuId, MPROP_BACKNAME, fmt("%L", id, "MENU_OPT_BACK"));
+	menu_setprop(iMenuId, MPROP_EXITNAME, fmt("%L", id, "MENU_OPT_EXIT"));
+
+	menu_display(id, iMenuId, 0);
 }
 
 public menu__PrimaryWeapons(const id, const menuid, const itemid)
 {
+	menu_destroy(menuid);
+
 	if(!IsAlive(id) || itemid == MENU_EXIT)
 		return PLUGIN_HANDLED;
 
 	g_iPrimaryWeapons[id] = itemid;
-	giveWeapons(id, 1);
+	GiveWeapons(id, true);
 
 	return PLUGIN_HANDLED;
 }
 
 public menu__SecondaryWeapons(const id, const menuid, const itemid)
 {
+	menu_destroy(menuid);
+
 	if(!IsAlive(id) || itemid == MENU_EXIT)
 		return PLUGIN_HANDLED;
 
 	g_iSecondaryWeapons[id] = itemid;
-	giveWeapons(id, 2);
+	GiveWeapons(id, false);
 	
-	showMenu__Weapons(id, 1);
+	showMenu__Weapons(id, true);
 	return PLUGIN_HANDLED;
 }
 
-public giveWeapons(const id, const weapon)
+GiveWeapons(const id, const bool:bPrimary)
 {
 	if(!IsAlive(id))
 		return;
 
-	switch(weapon)
+	if(bPrimary)
 	{
-		case 1:
+		new WeaponIdType:iWid = PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponId];
+
+		g_iPrimaryWeaponsEnt[id] = rg_give_item(id, PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponEnt]);
+
+		if((iWid == WEAPON_M4A1 || iWid == WEAPON_FAMAS) && !is_nullent(g_iPrimaryWeaponsEnt[id]))
 		{
-			new WeaponIdType:iWid = PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponId];
-
-			g_iPrimaryWeaponsEnt[id] = rg_give_item(id, PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponEnt]);
-
-			if((iWid == WEAPON_M4A1 || iWid == WEAPON_FAMAS) && !is_nullent(g_iPrimaryWeaponsEnt[id]))
+			switch(iWid)
 			{
-				switch(iWid)
+				case WEAPON_M4A1:
 				{
-					case WEAPON_M4A1:
-					{
-						cs_set_weapon_silen(g_iPrimaryWeaponsEnt[id], g_iWeaponData[id][weaponM4A1], 0);
+					cs_set_weapon_silen(g_iPrimaryWeaponsEnt[id], g_iWeaponData[id][weaponM4A1], 0);
 
-						if(g_iWeaponData[id][weaponM4A1])
-							setAnimation(id, 5);
-					}
-					case WEAPON_FAMAS: cs_set_weapon_burst(g_iPrimaryWeaponsEnt[id], g_iWeaponData[id][weaponFAMAS]);
+					if(g_iWeaponData[id][weaponM4A1])
+						setAnimation(id, 5);
 				}
+				case WEAPON_FAMAS: cs_set_weapon_burst(g_iPrimaryWeaponsEnt[id], g_iWeaponData[id][weaponFAMAS]);
 			}
 		}
+	}
+	else
+	{
+		new WeaponIdType:iWid = SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponId];
 
-		case 2:
+		g_iSecondaryWeaponsEnt[id] = rg_give_item(id, SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponEnt]);
+
+		if((iWid == WEAPON_USP || iWid == WEAPON_GLOCK18) && !is_nullent(g_iSecondaryWeaponsEnt[id]))
 		{
-			new WeaponIdType:iWid = SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponId];
-
-			g_iSecondaryWeaponsEnt[id] = rg_give_item(id, SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponEnt]);
-
-			if((iWid == WEAPON_USP || iWid == WEAPON_GLOCK18) && !is_nullent(g_iSecondaryWeaponsEnt[id]))
+			switch(iWid)
 			{
-				switch(iWid)
-				{
-					case CSW_USP: cs_set_weapon_silen(g_iSecondaryWeaponsEnt[id], g_iWeaponData[id][weaponUSP], 0);
-					case CSW_GLOCK18: cs_set_weapon_burst(g_iSecondaryWeaponsEnt[id], g_iWeaponData[id][weaponGLOCK]);
-				}
+				case CSW_USP: cs_set_weapon_silen(g_iSecondaryWeaponsEnt[id], g_iWeaponData[id][weaponUSP], 0);
+				case CSW_GLOCK18: cs_set_weapon_burst(g_iSecondaryWeaponsEnt[id], g_iWeaponData[id][weaponGLOCK]);
 			}
 		}
 	}
@@ -679,19 +662,20 @@ ShowMenu_Management(const id)
 			++iT;
 	}
 
-	new iMenuId = menu_create(fmt("\y%s : Configuración^n\dCT: [ %d ] | T: [ %d ] | Total: [ %d ]", g_szPluginName, iCt, iT, iSpawnsCount), "menu_Management");
+	new iMenuId = menu_create(fmt("\y%s : %L^n\dCT: [ %d ] | T: [ %d ] | Total: [ %d ]", 
+		g_szPluginName, id, "MENU_TITLE_MANAGEMENT", iCt, iT, iSpawnsCount), "menu_Management");
 
-	menu_additem(iMenuId, fmt("Tipo de spawn\y %s^n", g_bAllowRandomSpawns ? "Aleatorio" : "Por equipo"));
+	menu_additem(iMenuId, fmt("%L %L^n", id, "MENU_SPAWN_TYPE", id, g_bAllowRandomSpawns ? "MENU_SPAWN_TYPE_RANDOM" : "MENU_SPAWN_TYPE_TEAM"));
 	
-	menu_additem(iMenuId, "Crear spawn\y Anti Terrorista");
-	menu_additem(iMenuId, "Crear spawn\y Terrorista^n");
+	menu_additem(iMenuId, fmt("%L", id, "MENU_SPAWN_CREATE_CT"));
+	menu_additem(iMenuId, fmt("%L^n", id, "MENU_SPAWN_CREATE_TT"));
 	
-	menu_additem(iMenuId, "Borrar spawn\y Apuntado");
-	menu_additem(iMenuId, "Borrar spawns\y del Mapa^n");
+	menu_additem(iMenuId, fmt("%L", id, "MENU_SPAWN_DELETE_AIM"));
+	menu_additem(iMenuId, fmt("%L^n", id, "MENU_SPAWN_DELETE_ALL"));
 	
-	menu_additem(iMenuId, "\yGuardar^n");
+	menu_additem(iMenuId, fmt("%L^n", id, "MENU_SPAWN_SAVE_ALL"));
 	
-	menu_additem(iMenuId, "Salir");
+	menu_additem(iMenuId, fmt("%L", id, "MENU_OPT_EXIT"));
 	
 	menu_setprop(iMenuId, MPROP_EXIT, MEXIT_NEVER);
 	menu_setprop(iMenuId, MPROP_PERPAGE, 0);
@@ -780,7 +764,7 @@ public ClientCommand__Weapons(const id)
 	}
 
 	g_iDontShowTheMenuAgain[id] = 0;
-	client_print_color(id, print_team_default, "%sEn tu próxima regeneración podrás seleccionar nuevas armas!", g_szGlobalPrefix);
+	client_print_color(id, print_team_default, "%s %L", g_szGlobalPrefix, id, "CHAT_INFO_NEXT_REGEN");
 
 	return PLUGIN_HANDLED;
 }
@@ -929,9 +913,9 @@ SaveMapData(const id)
 	json_object_set_value(jRootValue, "spawns", jArray);
 	
 	if(json_serial_to_file(jRootValue, szFileName, true))
-		client_print_color(id, print_team_default, "%sArchivo^4 %s^1 guardado correctamente!", g_szGlobalPrefix, szFileName);
+		client_print_color(id, print_team_default, "%s %L", g_szGlobalPrefix, id, "CHAT_SAVED_OK", szFileName);
 	else
-		client_print_color(id, print_team_default, "%sArchivo^4 %s^1 no guardado!", g_szGlobalPrefix, szFileName);
+		client_print_color(id, print_team_default, "%s %L", g_szGlobalPrefix, id, "CHAT_SAVED_ERROR", szFileName);
 
 	json_free(jObjetSpawn);
 	json_free(jArray);

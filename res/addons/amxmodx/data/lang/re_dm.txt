@@ -1,0 +1,67 @@
+[es]
+MENU_OPT_BACK = \wPágina anterior
+MENU_OPT_NEXT = \wPágina siguiente
+MENU_OPT_EXIT = \wSalir
+
+MENU_TITLE_EQUIPMENT = \wEquipamiento
+MENU_TITLE_PRIMARY = \wArmas primarias
+MENU_TITLE_SECONDARY = \wArmas secundarias
+MENU_INFO_PRIMARY = \wArma primaria
+MENU_INFO_SECONDARY = \wArma secundaria
+
+MENU_NEW_WEAPONS = \wArmas nuevas
+MENU_PREV_SELECTION = \wSelección anterior
+MENU_PREV_DONT_SHOW_AGAIN = \w2 + No volver a mostrar el menú
+
+MENU_TITLE_MANAGEMENT = \wConfiguración
+MENU_SPAWN_TYPE = \wTipo de spawn
+MENU_SPAWN_TYPE_RANDOM = \yAleatorio
+MENU_SPAWN_TYPE_TEAM = \yEquipo
+MENU_SPAWN_CREATE_CT = \wCrear spawn\y Anti-Terrorista
+MENU_SPAWN_CREATE_TT = \wCrear spawn\y Terrorista
+MENU_SPAWN_DELETE_AIM = \wBorrar spawn\y apuntado
+MENU_SPAWN_DELETE_ALL = \wBorrar spawns\y del mapa
+MENU_SPAWN_SAVE_ALL = \yGuardar cambios
+
+CHAT_TYPE_GUNS = ^1Escribe^4 guns^1 en el chat para volver a habilitar tu menú de equipamiento 
+CHAT_INFO_NEXT_REGEN = ^1En tu próxima regeneración podrás seleccionar nuevas armas!
+CHAT_SAVED_OK = ^1El archivo^4 %s^1 ha sido guardado!
+CHAT_SAVED_ERROR = ^1El archivo^4 %s^1 no ha sido guardado!
+
+HUD_INFO_ONLYHEAD = ¡APUNTA A LA CABEZA!
+
+SERVER_INFO_SPAWNS_LOADED = Spawns cargados: %d
+
+[en]
+MENU_OPT_BACK = \wPrevious page
+MENU_OPT_NEXT = \wNext page
+MENU_OPT_EXIT = \wExit
+
+MENU_TITLE_EQUIPMENT = \wEquipment
+MENU_TITLE_PRIMARY = \wPrimary weapons
+MENU_TITLE_SECONDARY = \wSecondary weapons
+MENU_INFO_PRIMARY = \wPrimary weapon
+MENU_INFO_SECONDARY = \wSecondary weapon
+
+MENU_NEW_WEAPONS = \wNew weapons
+MENU_PREV_SELECTION = \wPrevious selection
+MENU_PREV_DONT_SHOW_AGAIN = \w2 + Don't show the menu again
+
+MENU_TITLE_MANAGEMENT = \wManagement
+MENU_SPAWN_TYPE = \wSpawn type
+MENU_SPAWN_TYPE_RANDOM = \yRandom
+MENU_SPAWN_TYPE_TEAM = \yTeam
+MENU_SPAWN_CREATE_CT = \wCreate\y Anti-Terrorist spawn
+MENU_SPAWN_CREATE_TT = \wCreate\y Terrorist spawn
+MENU_SPAWN_DELETE_AIM = \wDelete\y targeted spawn
+MENU_SPAWN_DELETE_ALL = \wDelete\y all spawns
+MENU_SPAWN_SAVE_ALL = \ySave changes
+
+CHAT_TYPE_GUNS = ^1Type^4 guns^1 in chat to re-enable your equip menu
+CHAT_INFO_NEXT_REGEN = ^1In your next regeneration you will be able to select new weapons!
+CHAT_SAVED_OK = ^1File^4 %s^1 has been saved!
+CHAT_SAVED_ERROR = ^1File^4 %s^1 hasn't been saved!
+
+HUD_INFO_ONLYHEAD = AIM AT THE HEAD!
+
+SERVER_INFO_SPAWNS_LOADED = Spawns loaded: %d
