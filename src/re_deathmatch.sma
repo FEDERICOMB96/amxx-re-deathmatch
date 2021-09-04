@@ -11,7 +11,7 @@
 * ============================================================================ */
 
 new const g_szPluginName[]     = "DEATHMATCH";
-new const g_szPluginVersion[]  = "v18";
+new const g_szPluginVersion[]  = "v21";
 new const g_szPluginAuthor[]   = "FEDERICOMB";
 new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1";
 
@@ -669,6 +669,8 @@ ShowMenu_Management(const id)
 	
 	menu_additem(iMenuId, fmt("%L", id, "MENU_SPAWN_CREATE_CT"));
 	menu_additem(iMenuId, fmt("%L^n", id, "MENU_SPAWN_CREATE_TT"));
+
+	menu_additem(iMenuId, fmt("%L^n", id, "MENU_SPAWN_SWITCH"));
 	
 	menu_additem(iMenuId, fmt("%L", id, "MENU_SPAWN_DELETE_AIM"));
 	menu_additem(iMenuId, fmt("%L^n", id, "MENU_SPAWN_DELETE_ALL"));
@@ -687,7 +689,7 @@ public menu_Management(const id, const menuid, const itemid)
 {
 	menu_destroy(menuid);
 
-	if(!IsConnected(id) || itemid == MENU_EXIT || itemid > 5)
+	if(!IsConnected(id) || itemid == MENU_EXIT || itemid > 6)
 	{
 		HideCustomSpawns();
 		return PLUGIN_HANDLED;
@@ -719,6 +721,24 @@ public menu_Management(const id, const menuid, const itemid)
 			if(iEnt > 0)
 			{
 				new iItem = get_entvar(iEnt, var_iuser1);
+
+				new aSpawn[ArraySpawns_e];
+				ArrayGetArray(g_aSpawns, iItem, aSpawn);
+
+				(aSpawn[SpawnTeam] == TEAM_TERRORIST)
+					? (aSpawn[SpawnTeam] = TEAM_CT)
+					: (aSpawn[SpawnTeam] = TEAM_TERRORIST);
+
+				ArraySetArray(g_aSpawns, iItem, aSpawn);
+			}
+		}
+		case 4:
+		{
+			new iEnt = FindCustomSpawn(id);
+			
+			if(iEnt > 0)
+			{
+				new iItem = get_entvar(iEnt, var_iuser1);
 				
 				set_entvar(iEnt, var_modelindex, 0);
 				set_entvar(iEnt, var_flags, FL_KILLME);
@@ -726,8 +746,8 @@ public menu_Management(const id, const menuid, const itemid)
 				ArrayDeleteItem(g_aSpawns, iItem);
 			}
 		}
-		case 4: ArrayClear(g_aSpawns);
-		case 5: SaveMapData(id);
+		case 5: ArrayClear(g_aSpawns);
+		case 6: SaveMapData(id);
 	}
 	
 	HideCustomSpawns();
