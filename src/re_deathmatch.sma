@@ -852,6 +852,7 @@ ShowCustomSpawns()
 		ArrayGetArray(g_aSpawns, i, aSpawn);
 		
 		xs_vec_copy(aSpawn[SpawnOrigin], vecOrigin);
+		vecOrigin[2] += 10.0; // Prevent stuck spawn
 		vecAngles[1] = aSpawn[SpawnAngles][1];
 		
 		CreateCustomSpawn(i, aSpawn[SpawnTeam], vecOrigin, vecAngles);
@@ -891,23 +892,26 @@ SaveMapData(const id)
 	json_object_set_bool(jRootValue, "random_spawn", g_bAllowRandomSpawns);
 
 	new JSON:jArray = json_init_array();
-	new JSON:jObjetSpawn = json_init_object();
+	new JSON:jObjectSpawn;
+	new Array:aObjectTemp = ArrayCreate(1, 1); // Save all json objects ids
 
-	for(new i = 0, aSpawn[ArraySpawns_e], iSpawnsCount = ArraySize(g_aSpawns); i < iSpawnsCount; i++)
+	for(new i = 0, aSpawn[ArraySpawns_e], iCount = ArraySize(g_aSpawns); i < iCount; ++i)
 	{
 		ArrayGetArray(g_aSpawns, i, aSpawn);
 
-		json_object_clear(jObjetSpawn);
+		jObjectSpawn = json_init_object();
+		ArrayPushCell(aObjectTemp, JSON:jObjectSpawn); // Push json object id
 
-		json_object_set_number(jObjetSpawn, "team", _:aSpawn[SpawnTeam]);
+		json_object_set_number(jObjectSpawn, "id", i+1);
+		json_object_set_number(jObjectSpawn, "team", _:aSpawn[SpawnTeam]);
 
-		json_object_set_string(jObjetSpawn, "origin", 
+		json_object_set_string(jObjectSpawn, "origin", 
 			fmt("%d %d %d", floatround(aSpawn[SpawnOrigin][0]), floatround(aSpawn[SpawnOrigin][1]), floatround(aSpawn[SpawnOrigin][2])));
 
-		json_object_set_string(jObjetSpawn, "angles", 
+		json_object_set_string(jObjectSpawn, "angles", 
 			fmt("%d %d %d", floatround(aSpawn[SpawnAngles][0]), floatround(aSpawn[SpawnAngles][1]), floatround(aSpawn[SpawnAngles][2])));
 
-		json_array_append_value(jArray, jObjetSpawn);
+		json_array_append_value(jArray, jObjectSpawn);
 	}
 
 	json_object_set_value(jRootValue, "spawns", jArray);
@@ -917,7 +921,14 @@ SaveMapData(const id)
 	else
 		client_print_color(id, print_team_default, "%s %L", g_szGlobalPrefix, id, "CHAT_SAVED_ERROR", szFileName);
 
-	json_free(jObjetSpawn);
+	// Free all objects
+	for(new i = 0, iCount = ArraySize(aObjectTemp); i < iCount; ++i)
+	{
+		jObjectSpawn = JSON:ArrayGetCell(aObjectTemp, i);
+		json_free(jObjectSpawn); // Free json object id
+	}
+
+	ArrayDestroy(aObjectTemp);
 	json_free(jArray);
 	json_free(jRootValue);
 }
