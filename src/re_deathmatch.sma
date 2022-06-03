@@ -11,7 +11,7 @@
 * ============================================================================ */
 
 new const g_szPluginName[]     = "DEATHMATCH";
-new const g_szPluginVersion[]  = "v21";
+new const g_szPluginVersion[]  = "v22";
 new const g_szPluginAuthor[]   = "FEDERICOMB";
 new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1";
 
@@ -161,7 +161,7 @@ public plugin_precache()
 
 public plugin_init()
 {
-	register_plugin(g_szPluginName, g_szPluginVersion, g_szPluginAuthor);
+	register_plugin(g_szPluginName, g_szPluginVersion, g_szPluginAuthor, "https://github.com/FEDERICOMB96/amxx-re-deathmatch");
 
 	g_aSpawns = ArrayCreate(ArraySpawns_e, 1);
 
@@ -319,6 +319,7 @@ public OnCBasePlayer_Spawn_Post(const this)
 
 	randomSpawn(this);
 
+	rg_internal_cmd(this, "weapon_knife");
 	OnTaskShowMenuWeapons(this);
 
 	set_member(this, m_iHideHUD, get_member(this, m_iHideHUD) | HIDEHUD_MONEY);
@@ -382,11 +383,8 @@ public OnCBasePlayer_Killed(const this, pevAttacker, iGib)
 		}
 	}
 
-	if(get_member(this, m_bitsDamageType) & DMG_FALL
-	|| (IsConnected(pevAttacker) && (GetCurrentWeapon(pevAttacker) == WEAPON_AWP || GetCurrentWeapon(pevAttacker) == WEAPON_SCOUT) && get_member(this, m_LastHitGroup) == HIT_HEAD))
-	{
+	if(IsConnected(pevAttacker) && (GetCurrentWeapon(pevAttacker) == WEAPON_AWP || GetCurrentWeapon(pevAttacker) == WEAPON_SCOUT) && get_member(this, m_LastHitGroup) == HIT_HEAD)
 		SetHookChainArg(3, ATYPE_INTEGER, 2);
-	}
 
 	if(pevAttacker == this || !IsConnected(pevAttacker))
 		return HC_CONTINUE;
@@ -1197,7 +1195,11 @@ GetDropOrigin(const id, Float:vecOrigin[3], iVelAdd = 0)
 
 WeaponIdType:GetCurrentWeapon(const id)
 {
-	return WeaponIdType:get_member(get_member(id, m_pActiveItem), m_iId);
+	new pActiveItem = get_member(id, m_pActiveItem);
+	if(is_nullent(pActiveItem))
+		return WEAPON_NONE;
+
+	return WeaponIdType:get_member(pActiveItem, m_iId);
 }
 
 bool:GetWeaponBurst(const pWeapon)
