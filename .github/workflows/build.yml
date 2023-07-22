@@ -100,7 +100,7 @@ jobs:
       - name: Deploying resources artifacts
         uses: actions/download-artifact@v2
         with:
-         name: MultiModManagerCS-${{needs.build.outputs.sha}}
+         name: ReDeathMatchCS-${{needs.build.outputs.sha}}
 
       - name: Packaging binaries
         id: packaging-job
