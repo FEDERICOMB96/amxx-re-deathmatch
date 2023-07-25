@@ -6,93 +6,9 @@
 #include <fakemeta>
 #include <json>
 #include <xs>
-#include "re_dm/dm_defines"
 #include "re_dm/dm_global"
 #include "re_dm/dm_utils"
 #include "re_dm/dm_weapons"
-
-/* ===========================================================================
-* 				[ Initiation & Global stuff ]
-* ============================================================================ */
-
-new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1";
-
-new g_bConnected;
-new g_bAlive;
-
-new g_iSyncHudDamage;
-new g_iMsgScreenFade;
-
-new bool:g_bAllowRandomSpawns = true;
-new bool:g_bShowingSpawns = false;
-
-enum _:ArraySpawns_e
-{
-	TeamName:SpawnTeam,
-	Float:SpawnOrigin[3],
-	Float:SpawnAngles[3],
-};
-new Array:g_aSpawns;
-
-new g_iCSDM_OnlyHead;
-new g_iCSDM_MedicKit;
-new g_iCSDM_RefillArmorOnKill;
-new g_iCSDM_KillDingSound;
-new g_iCSDM_ScreenFadeOnKill;
-new g_iCSDM_InstantReloadWeaponsOnKill;
-new g_iCSDM_BlockKillCommand;
-new g_iCSDM_BlockSpawnSounds;
-new g_iCSDM_BlockDrop;
-new g_iCSDM_FreeForAll;
-new Float:g_flCSDM_ItemStaytime;
-
-new g_Forward_Spawn;
-
-new const g_szCustomSpawnModels[][] =
-{
-	"",
-	"models/player/terror/terror.mdl",
-	"models/player/gign/gign.mdl",
-	""
-};
-
-new const g_szInfoTargetClass[]         = "info_target";
-new const g_szCustomSpawnClass[]        = "CustomSpawn";
-
-new const g_szMedKitClass[]             = "MedKit";
-new const g_szModel_MedicKit[]          = "models/w_medkit.mdl";
-new const g_szSound_MedicKit[]          = "items/smallmedkit1.wav";
-new const g_szSound_KillDing[]          = "buttons/bell1.wav";
-
-new const OBJECTIVES_ENTITIES[][] =
-{
-	"func_bomb_target", "info_bomb_target",	"info_vip_start", "func_vip_safetyzone", "func_escapezone",
-	"hostage_entity", "monster_scientist", "func_hostage_rescue", "info_hostage_rescue", "env_fog",
-	"env_rain", "env_snow", "item_longjump", "func_vehicle", "game_player_equip",
-	"info_map_parameters", "func_buyzone", "armoury_entity", "game_text"
-};
-
-new const TXTMSG_BLOCK[][] =
-{
-	"#Game_teammate_attack", "#Game_Commencing", "#Game_will_restart_in", 
-	"#Hostages_Not_Rescued", "#Round_Draw", "#Terrorists_Win", "#CTs_Win"
-};
-
-new const SENDAUDIO_BLOCK[][] =
-{
-	"%!MRAD_ctwin", "%!MRAD_terwin", "%!MRAD_rounddraw", "%!MRAD_FIREINHOLE",
-	"%!MRAD_BOMBPL", "%!MRAD_BOMBDEF", "%!MRAD_rescued"
-};
-
-#define IsPlayer(%0)                    (1 <= %0 <= MAX_CLIENTS)
-
-#define GetPlayerBit(%0,%1)             (IsPlayer(%1) && (%0 & (1 << (%1 & 31))))
-#define SetPlayerBit(%0,%1)             (IsPlayer(%1) && (%0 |= (1 << (%1 & 31))))
-#define ClearPlayerBit(%0,%1)           (IsPlayer(%1) && (%0 &= ~(1 << (%1 & 31))))
-#define SwitchPlayerBit(%0,%1)          (IsPlayer(%1) && (%0 ^= (1 << (%1 & 31))))
-
-#define IsConnected(%0)                 GetPlayerBit(g_bConnected, %0)
-#define IsAlive(%0)                     GetPlayerBit(g_bAlive, %0)
 
 /* =================================================================================
 * 				[ Plugin events ]
@@ -119,8 +35,8 @@ public plugin_init()
 	register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR, PLUGIN_URL);
 
 	g_aSpawns = ArrayCreate(ArraySpawns_e, 1);
-	g_aPrimaryWeapons = ArrayCreate(WeaponStruct, 1);
-	g_aSecondaryWeapons = ArrayCreate(WeaponStruct, 1);
+	g_aPrimaryWeapons = ArrayCreate(WeaponStruct_e, 1);
+	g_aSecondaryWeapons = ArrayCreate(WeaponStruct_e, 1);
 
 	loadSpawns();
 	WeaponsInit();
@@ -503,7 +419,7 @@ ShowMenuWeapons(const id, menuId = 0)
 		iMenuId = menu_create(fmt(
 			"\y%s%s\d |\w %L\R\y", PLUGIN_NAME, g_iCSDM_FreeForAll ? " + FFA" : "", LANG_PLAYER, "MENU_TITLE_PRIMARY"), "menu__PrimaryWeapons");
 
-		for(new i = 0, aWeapon[WeaponStruct], iMaxLoop = ArraySize(g_aPrimaryWeapons); i < iMaxLoop; ++i)
+		for(new i = 0, aWeapon[WeaponStruct_e], iMaxLoop = ArraySize(g_aPrimaryWeapons); i < iMaxLoop; ++i)
 		{
 			ArrayGetArray(g_aPrimaryWeapons, i, aWeapon);
 			menu_additem(iMenuId, aWeapon[WeaponName]);
@@ -514,7 +430,7 @@ ShowMenuWeapons(const id, menuId = 0)
 		iMenuId = menu_create(fmt(
 			"\y%s%s\d |\w %L\R\y", PLUGIN_NAME, g_iCSDM_FreeForAll ? " + FFA" : "", LANG_PLAYER, "MENU_TITLE_SECONDARY"), "menu__SecondaryWeapons");
 
-		for(new i = 0, aWeapon[WeaponStruct], iMaxLoop = ArraySize(g_aSecondaryWeapons); i < iMaxLoop; ++i)
+		for(new i = 0, aWeapon[WeaponStruct_e], iMaxLoop = ArraySize(g_aSecondaryWeapons); i < iMaxLoop; ++i)
 		{
 			ArrayGetArray(g_aSecondaryWeapons, i, aWeapon);
 			menu_additem(iMenuId, aWeapon[WeaponName]);
@@ -534,14 +450,14 @@ ShowMenuWeapons(const id, menuId = 0)
 
 		if(ArraySize(g_aPrimaryWeapons))
 		{
-			new aWeapon[WeaponStruct];
+			new aWeapon[WeaponStruct_e];
 			ArrayGetArray(g_aPrimaryWeapons, g_iPrimaryWeapons[id], aWeapon);
 			menu_addtext(iMenuId, fmt("%L\r:\y %s", LANG_PLAYER, "MENU_INFO_PRIMARY", aWeapon[WeaponName]));
 		}
 
 		if(ArraySize(g_aSecondaryWeapons))
 		{
-			new aWeapon[WeaponStruct];
+			new aWeapon[WeaponStruct_e];
 			ArrayGetArray(g_aSecondaryWeapons, g_iSecondaryWeapons[id], aWeapon);
 			menu_addtext(iMenuId, fmt("%L\r:\y %s", LANG_PLAYER, "MENU_INFO_SECONDARY", aWeapon[WeaponName]));
 		}
@@ -631,7 +547,7 @@ GiveWeapons(const id, const bWeaponType)
 		if((g_iBuyItem[id] & BUY_PRIMARY_ITEM) || (ArraySize(g_aPrimaryWeapons) < 1))
 			return;
 
-		new aPrimaryWeapon[WeaponStruct];
+		new aPrimaryWeapon[WeaponStruct_e];
 		ArrayGetArray(g_aPrimaryWeapons, g_iPrimaryWeapons[id], aPrimaryWeapon);
 		
 		new WeaponIdType:iWid = aPrimaryWeapon[WeaponId];
@@ -662,7 +578,7 @@ GiveWeapons(const id, const bWeaponType)
 		if((g_iBuyItem[id] & BUY_SECONDARY_ITEM) || (ArraySize(g_aSecondaryWeapons) < 1))
 			return;
 
-		new aSecondaryWeapon[WeaponStruct];
+		new aSecondaryWeapon[WeaponStruct_e];
 		ArrayGetArray(g_aSecondaryWeapons, g_iSecondaryWeapons[id], aSecondaryWeapon);
 
 		new WeaponIdType:iWid = aSecondaryWeapon[WeaponId];

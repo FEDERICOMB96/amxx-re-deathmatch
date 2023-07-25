@@ -22,7 +22,7 @@ WeaponsInit() {
 	{
 		if(json_is_object(jWeapons))
 		{
-			new aWeaponData[WeaponStruct];
+			new aWeaponData[WeaponStruct_e];
 
 			if(json_object_has_value(jWeapons, "primary", JSONObject))
 			{
