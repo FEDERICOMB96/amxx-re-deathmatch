@@ -1,4 +1,11 @@
 [es]
+INVALID_JSON_FILE = Archivo JSON inválido
+
+INVALID_WEAPON_ENT = Entidad de arma inválida
+INVALID_PRIMARY_WEAPON = Arma primaria inválida
+INVALID_SECONDARY_WEAPON = Arma secundaria inválida
+NO_WEAPONS_LOADED = No hay armas cargadas, el complemento no se puede inicializar
+
 MENU_OPT_BACK = \wPágina anterior
 MENU_OPT_NEXT = \wPágina siguiente
 MENU_OPT_EXIT = \wSalir
@@ -34,6 +41,13 @@ HUD_INFO_ONLYHEAD = ¡APUNTA A LA CABEZA!
 SERVER_INFO_SPAWNS_LOADED = Spawns cargados: %d
 
 [en]
+INVALID_JSON_FILE = Invalid JSON file
+
+INVALID_WEAPON_ENT = Invalid weapon entity
+INVALID_PRIMARY_WEAPON = Invalid primary weapon
+INVALID_SECONDARY_WEAPON = Invalid secondary weapon
+NO_WEAPONS_LOADED = No weapons loaded, plugin can't be initialized
+
 MENU_OPT_BACK = \wPrevious page
 MENU_OPT_NEXT = \wNext page
 MENU_OPT_EXIT = \wExit

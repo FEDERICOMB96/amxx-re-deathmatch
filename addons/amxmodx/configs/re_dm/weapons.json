@@ -1,0 +1,30 @@
+{
+	"primary": {
+		"weapon_m4a1": "M4A1 Carbine", 
+		"weapon_ak47": "AK-47 Kalashnikov",
+		"weapon_aug": "Steyr AUG A1",
+		"weapon_sg552": "SG-552 Commando",
+		"weapon_galil": "IMI Galil",
+		"weapon_famas": "Famas",
+		"weapon_scout": "Schmidt Scout",
+		"weapon_awp": "AWP Magnum Sniper",
+		"weapon_sg550": "SG-550 Auto-Sniper",
+		"weapon_m249": "M249 Machine Gun",
+		"weapon_g3sg1": "G3/SG-1 Auto-Sniper",
+		"weapon_ump45": "UMP 45",
+		"weapon_mp5navy": "MP5 Navy",
+		"weapon_m3": "M3 Super 90",
+		"weapon_xm1014": "XM1014 M4",
+		"weapon_tmp": "Schmidt TMP",
+		"weapon_mac10": "Ingram MAC-10",
+		"weapon_p90": "ES P90"
+	},
+	"secondary": {
+		"weapon_usp": "USP .45 ACP Tactical", 
+		"weapon_glock18": "Glock 18C",
+		"weapon_deagle": "Desert Eagle .50 AE",
+		"weapon_p228": "P228 Compact",
+		"weapon_elite": "Dual Elite Berettas",
+		"weapon_fiveseven": "Five SeveN"
+	}
+}

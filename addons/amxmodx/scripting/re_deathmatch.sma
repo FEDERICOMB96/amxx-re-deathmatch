@@ -1,41 +1,24 @@
 #include <amxmodx>
+#include <amxmisc>
 #include <reapi>
 #include <cstrike>
 #include <engine>
 #include <fakemeta>
 #include <json>
 #include <xs>
+#include "re_dm/dm_defines"
+#include "re_dm/dm_global"
+#include "re_dm/dm_utils"
+#include "re_dm/dm_weapons"
 
 /* ===========================================================================
 * 				[ Initiation & Global stuff ]
 * ============================================================================ */
 
-new const g_szPluginName[]     = "DEATHMATCH";
-new const g_szPluginVersion[]  = "v22";
-new const g_szPluginAuthor[]   = "FEDERICOMB";
-new const g_szPluginUrl[]      = "https://github.com/FEDERICOMB96/amxx-re-deathmatch";
 new const g_szGlobalPrefix[]   = "^4[DEATHMATCH]^1";
-
-#define MAX_USERS              MAX_CLIENTS+1
-#define BUY_PRIMARY_ITEM       (1<<0)
-#define BUY_SECONDARY_ITEM     (1<<1)
 
 new g_bConnected;
 new g_bAlive;
-
-new g_iPrimaryWeapons[MAX_USERS];
-new g_iSecondaryWeapons[MAX_USERS];
-new g_iDontShowTheMenuAgain[MAX_USERS];
-new g_iBuyItem[MAX_USERS];
-
-enum _:structWeaponData
-{
-	weaponM4A1 = 0,
-	weaponFAMAS,
-	weaponUSP,
-	weaponGLOCK
-};
-new g_iWeaponData[MAX_USERS][structWeaponData];
 
 new g_iSyncHudDamage;
 new g_iMsgScreenFade;
@@ -64,46 +47,6 @@ new g_iCSDM_FreeForAll;
 new Float:g_flCSDM_ItemStaytime;
 
 new g_Forward_Spawn;
-
-enum _:e_StructWeapons
-{
-	WeaponIdType:weaponId,
-	weaponEnt[54],
-	weaponNames[32],
-	bool:weaponSilenced
-};
-
-new const PRIMARY_WEAPONS[][e_StructWeapons] =
-{
-	{WEAPON_M4A1,       "weapon_m4a1",      "M4A1",                 true},
-	{WEAPON_AK47,       "weapon_ak47",      "AK-47",                false},
-	{WEAPON_AUG,        "weapon_aug",       "AUG",                  false},
-	{WEAPON_SG552,      "weapon_sg552",     "SG-552",               false},
-	{WEAPON_GALIL,      "weapon_galil",     "Galil",                false},
-	{WEAPON_FAMAS,      "weapon_famas",     "Famas",                true},
-	{WEAPON_SCOUT,      "weapon_scout",     "Scout",                false},
-	{WEAPON_AWP,        "weapon_awp",       "AWP",                  false},
-	{WEAPON_SG550,      "weapon_sg550",     "SG-550",               false},
-	{WEAPON_M249,       "weapon_m249",      "M249",                 false},
-	{WEAPON_G3SG1,      "weapon_g3sg1",     "G3-SG1",               false},
-	{WEAPON_UMP45,      "weapon_ump45",     "UMP 45",               false},
-	{WEAPON_MP5N,       "weapon_mp5navy",   "MP5 Navy",             false},
-	{WEAPON_M3,         "weapon_m3",        "M3",                   false},
-	{WEAPON_XM1014,     "weapon_xm1014",    "XM1014",               false},
-	{WEAPON_TMP,        "weapon_tmp",       "TMP",                  false},
-	{WEAPON_MAC10,      "weapon_mac10",     "Mac",                  false},
-	{WEAPON_P90,        "weapon_p90",       "P90",                  false}
-};
-
-new const SECONDARY_WEAPONS[][e_StructWeapons] =
-{
-	{WEAPON_USP,        "weapon_usp",       "USP",                  true},
-	{WEAPON_GLOCK18,    "weapon_glock18",   "Glock",                true},
-	{WEAPON_DEAGLE,     "weapon_deagle",    "Deagle",               false},
-	{WEAPON_P228,       "weapon_p228",      "P228",                 false},
-	{WEAPON_ELITE,      "weapon_elite",     "Elite",                false},
-	{WEAPON_FIVESEVEN,  "weapon_fiveseven", "Five SeveN",           false}
-};
 
 new const g_szCustomSpawnModels[][] =
 {
@@ -158,9 +101,9 @@ new const SENDAUDIO_BLOCK[][] =
 public plugin_precache()
 {
 	new sBuffer[256];
-	formatex(sBuffer, 63, "%s %s by FEDERICOMB", g_szPluginName, g_szPluginVersion);
+	formatex(sBuffer, 63, "%s %s by FEDERICOMB", PLUGIN_NAME, PLUGIN_VERSION);
 	set_pcvar_string(create_cvar("dm_version", sBuffer, FCVAR_SERVER | FCVAR_SPONLY), sBuffer);
-	set_pcvar_string(create_cvar("dm_url", g_szPluginUrl, FCVAR_SERVER | FCVAR_SPONLY), g_szPluginUrl);
+	set_pcvar_string(create_cvar("dm_url", PLUGIN_URL, FCVAR_SERVER | FCVAR_SPONLY), PLUGIN_URL);
 	set_pcvar_string(create_cvar("csdm_version", sBuffer, FCVAR_SERVER | FCVAR_SPONLY), sBuffer);
 	set_pcvar_string(create_cvar("csdm_active", "1", FCVAR_SERVER | FCVAR_SPONLY), "1");
 
@@ -173,11 +116,14 @@ public plugin_precache()
 
 public plugin_init()
 {
-	register_plugin(g_szPluginName, g_szPluginVersion, g_szPluginAuthor, g_szPluginUrl);
+	register_plugin(PLUGIN_NAME, PLUGIN_VERSION, PLUGIN_AUTHOR, PLUGIN_URL);
 
 	g_aSpawns = ArrayCreate(ArraySpawns_e, 1);
+	g_aPrimaryWeapons = ArrayCreate(WeaponStruct, 1);
+	g_aSecondaryWeapons = ArrayCreate(WeaponStruct, 1);
 
 	loadSpawns();
+	WeaponsInit();
 
 	bind_pcvar_num(create_cvar("csdm_only_head", "0"), g_iCSDM_OnlyHead);
 	bind_pcvar_num(create_cvar("csdm_drop_medic", "0"), g_iCSDM_MedicKit);
@@ -228,6 +174,8 @@ public OnConfigsExecuted()
 public plugin_end()
 {
 	if(g_aSpawns != Invalid_Array) ArrayDestroy(g_aSpawns);
+	if(g_aPrimaryWeapons != Invalid_Array) ArrayDestroy(g_aPrimaryWeapons);
+	if(g_aSecondaryWeapons != Invalid_Array) ArrayDestroy(g_aSecondaryWeapons);
 }
 
 /* ===========================================================================
@@ -319,7 +267,7 @@ public client_putinserver(id)
 	g_iDontShowTheMenuAgain[id] = 0;
 	g_iBuyItem[id] = 0;
 
-	arrayset(g_iWeaponData[id], 0, structWeaponData);
+	arrayset(g_iWeaponData[id], 0, sizeof(g_iWeaponData[]));
 }
 
 public client_disconnected(id)
@@ -385,9 +333,9 @@ public OnCBasePlayer_Killed(const this, pevAttacker, iGib)
 {
 	ClearPlayerBit(g_bAlive, this);
 
-	arrayset(g_iWeaponData[this], 0, structWeaponData);
+	arrayset(g_iWeaponData[this], 0, sizeof(g_iWeaponData[]));
 	
-	new WeaponIdType:iWeapon = GetCurrentWeapon(this);
+	new WeaponIdType:iWeapon = UTIL_GetCurrentWeapon(this);
 	if(iWeapon == WEAPON_FAMAS || iWeapon == WEAPON_USP || iWeapon == WEAPON_GLOCK18 || iWeapon == WEAPON_M4A1)
 	{
 		new pActiveItem = get_member(this, m_pActiveItem);
@@ -395,15 +343,15 @@ public OnCBasePlayer_Killed(const this, pevAttacker, iGib)
 		{
 			switch(iWeapon)
 			{
-				case WEAPON_FAMAS: g_iWeaponData[this][weaponFAMAS] = GetWeaponBurst(pActiveItem);
-				case WEAPON_USP: g_iWeaponData[this][weaponUSP] = GetWeaponSilen(pActiveItem);
-				case WEAPON_GLOCK18: g_iWeaponData[this][weaponGLOCK] = GetWeaponBurst(pActiveItem);
-				case WEAPON_M4A1: g_iWeaponData[this][weaponM4A1] = GetWeaponSilen(pActiveItem);
+				case WEAPON_FAMAS: g_iWeaponData[this][WeaponDataFAMAS] = UTIL_GetWeaponBurst(pActiveItem);
+				case WEAPON_USP: g_iWeaponData[this][WeaponDataUSP] = UTIL_GetWeaponSilen(pActiveItem);
+				case WEAPON_GLOCK18: g_iWeaponData[this][WeaponDataGLOCK] = UTIL_GetWeaponBurst(pActiveItem);
+				case WEAPON_M4A1: g_iWeaponData[this][WeaponDataM4A1] = UTIL_GetWeaponSilen(pActiveItem);
 			}
 		}
 	}
 	
-	if(IsConnected(pevAttacker) && (GetCurrentWeapon(pevAttacker) == WEAPON_AWP || GetCurrentWeapon(pevAttacker) == WEAPON_SCOUT) && get_member(this, m_bHeadshotKilled))
+	if(IsConnected(pevAttacker) && (UTIL_GetCurrentWeapon(pevAttacker) == WEAPON_AWP || UTIL_GetCurrentWeapon(pevAttacker) == WEAPON_SCOUT) && get_member(this, m_bHeadshotKilled))
 		SetHookChainArg(3, ATYPE_INTEGER, 2);
 		
 	return HC_CONTINUE;
@@ -553,23 +501,29 @@ ShowMenuWeapons(const id, menuId = 0)
 	if(menuId == BUY_PRIMARY_ITEM)
 	{
 		iMenuId = menu_create(fmt(
-			"\y%s%s\d |\w %L\R\y", g_szPluginName, g_iCSDM_FreeForAll ? " + FFA" : "", LANG_PLAYER, "MENU_TITLE_PRIMARY"), "menu__PrimaryWeapons");
+			"\y%s%s\d |\w %L\R\y", PLUGIN_NAME, g_iCSDM_FreeForAll ? " + FFA" : "", LANG_PLAYER, "MENU_TITLE_PRIMARY"), "menu__PrimaryWeapons");
 
-		for(new i = 0; i < sizeof(PRIMARY_WEAPONS); ++i)
-			menu_additem(iMenuId, PRIMARY_WEAPONS[i][weaponNames]);
+		for(new i = 0, aWeapon[WeaponStruct], iMaxLoop = ArraySize(g_aPrimaryWeapons); i < iMaxLoop; ++i)
+		{
+			ArrayGetArray(g_aPrimaryWeapons, i, aWeapon);
+			menu_additem(iMenuId, aWeapon[WeaponName]);
+		}
 	}
 	else if(menuId == BUY_SECONDARY_ITEM)
 	{
 		iMenuId = menu_create(fmt(
-			"\y%s%s\d |\w %L\R\y", g_szPluginName, g_iCSDM_FreeForAll ? " + FFA" : "", LANG_PLAYER, "MENU_TITLE_SECONDARY"), "menu__SecondaryWeapons");
-		
-		for(new i = 0; i < sizeof(SECONDARY_WEAPONS); ++i)
-			menu_additem(iMenuId, SECONDARY_WEAPONS[i][weaponNames]);
+			"\y%s%s\d |\w %L\R\y", PLUGIN_NAME, g_iCSDM_FreeForAll ? " + FFA" : "", LANG_PLAYER, "MENU_TITLE_SECONDARY"), "menu__SecondaryWeapons");
+
+		for(new i = 0, aWeapon[WeaponStruct], iMaxLoop = ArraySize(g_aSecondaryWeapons); i < iMaxLoop; ++i)
+		{
+			ArrayGetArray(g_aSecondaryWeapons, i, aWeapon);
+			menu_additem(iMenuId, aWeapon[WeaponName]);
+		}
 	}
 	else
 	{
 		iMenuId = menu_create(fmt(
-			"\y%s%s\d |\w %L", g_szPluginName, g_iCSDM_FreeForAll ? " + FFA" : "", LANG_PLAYER, "MENU_TITLE_EQUIPMENT"),
+			"\y%s%s\d |\w %L", PLUGIN_NAME, g_iCSDM_FreeForAll ? " + FFA" : "", LANG_PLAYER, "MENU_TITLE_EQUIPMENT"),
 		"menu__Equip");
 
 		menu_additem(iMenuId, fmt("%L", LANG_PLAYER, "MENU_NEW_WEAPONS"));
@@ -577,8 +531,20 @@ ShowMenuWeapons(const id, menuId = 0)
 		menu_additem(iMenuId, fmt("%L", LANG_PLAYER, "MENU_PREV_DONT_SHOW_AGAIN"));
 
 		menu_addblank(iMenuId);
-		menu_addtext(iMenuId, fmt("%L\r:\y %s", LANG_PLAYER, "MENU_INFO_PRIMARY", PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponNames]));
-		menu_addtext(iMenuId, fmt("%L\r:\y %s", LANG_PLAYER, "MENU_INFO_SECONDARY", SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponNames]));
+
+		if(ArraySize(g_aPrimaryWeapons))
+		{
+			new aWeapon[WeaponStruct];
+			ArrayGetArray(g_aPrimaryWeapons, g_iPrimaryWeapons[id], aWeapon);
+			menu_addtext(iMenuId, fmt("%L\r:\y %s", LANG_PLAYER, "MENU_INFO_PRIMARY", aWeapon[WeaponName]));
+		}
+
+		if(ArraySize(g_aSecondaryWeapons))
+		{
+			new aWeapon[WeaponStruct];
+			ArrayGetArray(g_aSecondaryWeapons, g_iSecondaryWeapons[id], aWeapon);
+			menu_addtext(iMenuId, fmt("%L\r:\y %s", LANG_PLAYER, "MENU_INFO_SECONDARY", aWeapon[WeaponName]));
+		}
 
 		menu_setprop(iMenuId, MPROP_EXIT, MEXIT_NEVER);
 	}
@@ -599,7 +565,12 @@ public menu__Equip(const id, const menuid, const itemid)
 
 	switch(itemid)
 	{
-		case 0: ShowMenuWeapons(id, BUY_SECONDARY_ITEM);
+		case 0:
+		{
+			ArraySize(g_aSecondaryWeapons)
+				? ShowMenuWeapons(id, BUY_SECONDARY_ITEM)
+				: ShowMenuWeapons(id, BUY_PRIMARY_ITEM);
+		}
 
 		case 1:
 		{
@@ -644,7 +615,9 @@ public menu__SecondaryWeapons(const id, const menuid, const itemid)
 	g_iSecondaryWeapons[id] = itemid;
 	GiveWeapons(id, BUY_SECONDARY_ITEM);
 	
-	ShowMenuWeapons(id, BUY_PRIMARY_ITEM);
+	if(ArraySize(g_aPrimaryWeapons))
+		ShowMenuWeapons(id, BUY_PRIMARY_ITEM);
+
 	return PLUGIN_HANDLED;
 }
 
@@ -655,11 +628,14 @@ GiveWeapons(const id, const bWeaponType)
 
 	if(bWeaponType == BUY_PRIMARY_ITEM)
 	{
-		if(g_iBuyItem[id] & BUY_PRIMARY_ITEM)
+		if((g_iBuyItem[id] & BUY_PRIMARY_ITEM) || (ArraySize(g_aPrimaryWeapons) < 1))
 			return;
 
-		new WeaponIdType:iWid = PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponId];
-		new iWeaponEnt = rg_give_item(id, PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponEnt]);
+		new aPrimaryWeapon[WeaponStruct];
+		ArrayGetArray(g_aPrimaryWeapons, g_iPrimaryWeapons[id], aPrimaryWeapon);
+		
+		new WeaponIdType:iWid = aPrimaryWeapon[WeaponId];
+		new iWeaponEnt = rg_give_item(id, aPrimaryWeapon[WeaponEnt]);
 
 		if((iWid == WEAPON_M4A1 || iWid == WEAPON_FAMAS) && !is_nullent(iWeaponEnt))
 		{
@@ -667,38 +643,41 @@ GiveWeapons(const id, const bWeaponType)
 			{
 				case WEAPON_M4A1:
 				{
-					cs_set_weapon_silen(iWeaponEnt, g_iWeaponData[id][weaponM4A1], 0);
+					cs_set_weapon_silen(iWeaponEnt, g_iWeaponData[id][WeaponDataM4A1], 0);
 
-					if(g_iWeaponData[id][weaponM4A1])
-						setAnimation(id, 5);
+					if(g_iWeaponData[id][WeaponDataM4A1])
+						UTIL_SetAnimation(id, 5);
 				}
-				case WEAPON_FAMAS: cs_set_weapon_burst(iWeaponEnt, g_iWeaponData[id][weaponFAMAS]);
+				case WEAPON_FAMAS: cs_set_weapon_burst(iWeaponEnt, g_iWeaponData[id][WeaponDataFAMAS]);
 			}
 		}
 
-		rg_internal_cmd(id, PRIMARY_WEAPONS[g_iPrimaryWeapons[id]][weaponEnt]);
+		rg_internal_cmd(id, aPrimaryWeapon[WeaponEnt]);
 		g_iBuyItem[id] |= BUY_PRIMARY_ITEM;
 
 		client_cmd(id, "spk items/gunpickup2.wav");
 	}
 	else if(bWeaponType == BUY_SECONDARY_ITEM)
 	{
-		if(g_iBuyItem[id] & BUY_SECONDARY_ITEM)
+		if((g_iBuyItem[id] & BUY_SECONDARY_ITEM) || (ArraySize(g_aSecondaryWeapons) < 1))
 			return;
 
-		new WeaponIdType:iWid = SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponId];
-		new iWeaponEnt = rg_give_item(id, SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponEnt]);
+		new aSecondaryWeapon[WeaponStruct];
+		ArrayGetArray(g_aSecondaryWeapons, g_iSecondaryWeapons[id], aSecondaryWeapon);
+
+		new WeaponIdType:iWid = aSecondaryWeapon[WeaponId];
+		new iWeaponEnt = rg_give_item(id, aSecondaryWeapon[WeaponEnt]);
 
 		if((iWid == WEAPON_USP || iWid == WEAPON_GLOCK18) && !is_nullent(iWeaponEnt))
 		{
 			switch(iWid)
 			{
-				case CSW_USP: cs_set_weapon_silen(iWeaponEnt, g_iWeaponData[id][weaponUSP], 0);
-				case CSW_GLOCK18: cs_set_weapon_burst(iWeaponEnt, g_iWeaponData[id][weaponGLOCK]);
+				case CSW_USP: cs_set_weapon_silen(iWeaponEnt, g_iWeaponData[id][WeaponDataUSP], 0);
+				case CSW_GLOCK18: cs_set_weapon_burst(iWeaponEnt, g_iWeaponData[id][WeaponDataGLOCK]);
 			}
 		}
 
-		rg_internal_cmd(id, SECONDARY_WEAPONS[g_iSecondaryWeapons[id]][weaponEnt]);
+		rg_internal_cmd(id, aSecondaryWeapon[WeaponEnt]);
 		g_iBuyItem[id] |= BUY_SECONDARY_ITEM;
 
 		client_cmd(id, "spk items/gunpickup2.wav");
@@ -721,7 +700,7 @@ ShowMenu_Management(const id)
 	}
 
 	new iMenuId = menu_create(fmt("\y%s : %L^n\dCT: [ %d ] | T: [ %d ] | Total: [ %d ]", 
-		g_szPluginName, LANG_PLAYER, "MENU_TITLE_MANAGEMENT", iCt, iT, iSpawnsCount), "menu_Management");
+		PLUGIN_NAME, LANG_PLAYER, "MENU_TITLE_MANAGEMENT", iCt, iT, iSpawnsCount), "menu_Management");
 
 	menu_additem(iMenuId, fmt("%L %L^n", LANG_PLAYER, "MENU_SPAWN_TYPE", id, g_bAllowRandomSpawns ? "MENU_SPAWN_TYPE_RANDOM" : "MENU_SPAWN_TYPE_TEAM"));
 	
@@ -840,12 +819,12 @@ public ClientCommand__Weapons(const id)
 	if(!IsConnected(id))
 		return PLUGIN_HANDLED;
 
-	if(!g_iBuyItem[id])
+	if((~g_iBuyItem[id] & BUY_SECONDARY_ITEM) && ArraySize(g_aSecondaryWeapons))
 	{
-		ShowMenuWeapons(id);
+		ShowMenuWeapons(id, BUY_SECONDARY_ITEM);
 		return PLUGIN_HANDLED;
 	}
-	else if(~g_iBuyItem[id] & BUY_PRIMARY_ITEM)
+	else if((~g_iBuyItem[id] & BUY_PRIMARY_ITEM) && ArraySize(g_aPrimaryWeapons))
 	{
 		ShowMenuWeapons(id, BUY_PRIMARY_ITEM);
 		return PLUGIN_HANDLED;
@@ -1143,16 +1122,6 @@ public TeamName:GetUserTeam(const id)
 	return TeamName:get_member(id, m_iTeam);
 }
 
-setAnimation(const id, const animation)
-{
-	set_entvar(id, var_weaponanim, animation);
-	
-	message_begin(MSG_ONE, SVC_WEAPONANIM, _, id);
-	write_byte(animation);
-	write_byte(get_entvar(id, var_body));
-	message_end();
-}
-
 DropMedKit(const id)
 {
 	new iEnt = rg_create_entity("info_target");
@@ -1261,48 +1230,4 @@ GetDropOrigin(const id, Float:vecOrigin[3], iVelAdd = 0)
 	
 	vecOrigin[0] += vecAim[0];
 	vecOrigin[1] += vecAim[1];
-}
-
-WeaponIdType:GetCurrentWeapon(const id)
-{
-	new pActiveItem = get_member(id, m_pActiveItem);
-	if(is_nullent(pActiveItem))
-		return WEAPON_NONE;
-
-	return WeaponIdType:get_member(pActiveItem, m_iId);
-}
-
-bool:GetWeaponBurst(const pWeapon)
-{
-	switch(WeaponIdType:get_member(pWeapon, m_iId))
-	{
-		case WEAPON_GLOCK18: return bool:(get_member(pWeapon, m_Weapon_iWeaponState) & WPNSTATE_GLOCK18_BURST_MODE);
-		case WEAPON_FAMAS:   return bool:(get_member(pWeapon, m_Weapon_iWeaponState) & WPNSTATE_FAMAS_BURST_MODE);
-	}
-
-	return false;
-}
-
-bool:GetWeaponSilen(const pWeapon)
-{
-	switch(WeaponIdType:get_member(pWeapon, m_iId))
-	{
-		case WEAPON_M4A1: return bool:(get_member(pWeapon, m_Weapon_iWeaponState) & WPNSTATE_M4A1_SILENCED);
-		case WEAPON_USP:  return bool:(get_member(pWeapon, m_Weapon_iWeaponState) & WPNSTATE_USP_SILENCED);
-	}
-
-	return false;
-}
-
-stock UTIL_RegisterClientCommandAll(const command[], function[], flags = -1, const info[] = "", FlagManager = -1, bool:info_ml = false)
-{
-	register_clcmd(fmt("say %s", command), function, flags, info, FlagManager, info_ml);
-	register_clcmd(fmt("say /%s", command), function, flags, info, FlagManager, info_ml);
-	register_clcmd(fmt("say !%s", command), function, flags, info, FlagManager, info_ml);
-	register_clcmd(fmt("say .%s", command), function, flags, info, FlagManager, info_ml);
-
-	register_clcmd(fmt("say_team %s", command), function, flags, info, FlagManager, info_ml);
-	register_clcmd(fmt("say_team /%s", command), function, flags, info, FlagManager, info_ml);
-	register_clcmd(fmt("say_team !%s", command), function, flags, info, FlagManager, info_ml);
-	register_clcmd(fmt("say_team .%s", command), function, flags, info, FlagManager, info_ml);
 }
