@@ -6,9 +6,9 @@
 #include <fakemeta>
 #include <json>
 #include <xs>
-#include "re_dm/dm_global"
-#include "re_dm/dm_utils"
-#include "re_dm/dm_weapons"
+#include "include/re_dm/dm_global"
+#include "include/re_dm/dm_utils"
+#include "include/re_dm/dm_weapons"
 
 /* =================================================================================
 * 				[ Plugin events ]
