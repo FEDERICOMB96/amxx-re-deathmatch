@@ -5,7 +5,7 @@
 
 #define DM_VERSION_MAJOR                0
 #define DM_VERSION_MINOR                0
-#define DM_VERSION_PATCH                10
+#define DM_VERSION_PATCH                11
 
 #define PLUGIN_NAME                     "DeathMatch CS"
 #define PLUGIN_VERSION                  fmt("v%d.%d.%d", DM_VERSION_MAJOR, DM_VERSION_MINOR, DM_VERSION_PATCH)
@@ -30,14 +30,6 @@
 
 #define IsConnected(%0)                 GetPlayerBit(g_bConnected, %0)
 #define IsAlive(%0)                     GetPlayerBit(g_bAlive, %0)
-
-new const OBJECTIVES_ENTITIES[][] =
-{
-	"func_bomb_target", "info_bomb_target",	"info_vip_start", "func_vip_safetyzone", "func_escapezone",
-	"hostage_entity", "monster_scientist", "func_hostage_rescue", "info_hostage_rescue", "env_fog",
-	"env_rain", "env_snow", "item_longjump", "func_vehicle", "game_player_equip",
-	"info_map_parameters", "func_buyzone", "armoury_entity", "game_text"
-};
 
 new const TXTMSG_BLOCK[][] =
 {
@@ -68,8 +60,6 @@ new g_bAlive;
 
 new g_iSyncHudDamage;
 new g_iMsgScreenFade;
-
-new g_Forward_Spawn;
 
 /* ===========================================================================
 *                 [ CVARS ]

@@ -24,8 +24,6 @@ public plugin_precache()
 	set_pcvar_string(create_cvar("csdm_version", sBuffer, FCVAR_SERVER | FCVAR_SPONLY), sBuffer);
 	set_pcvar_string(create_cvar("csdm_active", "1", FCVAR_SERVER | FCVAR_SPONLY), "1");
 
-	g_Forward_Spawn = register_forward(FM_Spawn, "OnFw__Spawn");
-
 	precache_model(g_szModel_MedicKit);
 	precache_sound(g_szSound_MedicKit);
 	precache_sound(g_szSound_KillDing);
@@ -63,8 +61,6 @@ public plugin_init()
 	RegisterHookChain(RG_CBasePlayer_Killed, "OnCBasePlayer_Killed", 0);
 	RegisterHookChain(RG_CBasePlayer_Killed, "OnCBasePlayer_Killed_Post", 1);
 	RegisterHookChain(RG_CBasePlayer_AddAccount, "OnCBasePlayer_AddAccount", 0);
-
-	unregister_forward(FM_Spawn, g_Forward_Spawn);
 
 	register_forward(FM_ClientKill, "OnFw__ClientKill");
 
@@ -247,26 +243,6 @@ public OnCBasePlayer_Killed_Post(const this, pevAttacker, iGib)
 public OnCBasePlayer_AddAccount(const iId, iAmount, RewardType:iType, bool:bTrackChange)
 {
 	return HC_SUPERCEDE;
-}
-
-public OnFw__Spawn(const entity)
-{
-	if(is_nullent(entity))
-		return FMRES_IGNORED;
-
-	new szClassName[32];
-	get_entvar(entity, var_classname, szClassName, charsmax(szClassName));
-
-	for(new i = 0; i < sizeof(OBJECTIVES_ENTITIES); ++i)
-	{
-		if(equal(szClassName, OBJECTIVES_ENTITIES[i]))
-		{
-			remove_entity(entity);
-			return FMRES_SUPERCEDE;
-		}
-	}
-	
-	return FMRES_IGNORED;
 }
 
 public OnFw__ClientKill()
