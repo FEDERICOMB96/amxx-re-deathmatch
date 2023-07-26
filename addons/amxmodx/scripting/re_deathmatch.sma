@@ -38,7 +38,7 @@ public plugin_init()
 	g_aPrimaryWeapons = ArrayCreate(WeaponStruct_e, 1);
 	g_aSecondaryWeapons = ArrayCreate(WeaponStruct_e, 1);
 
-	loadSpawns();
+	SpawnsInit();
 	WeaponsInit();
 
 	bind_pcvar_num(create_cvar("csdm_only_head", "0"), g_iCSDM_OnlyHead);
@@ -71,8 +71,6 @@ public plugin_init()
 	set_msg_block(get_user_msgid("Radar"), BLOCK_SET);
 
 	register_clcmd("drop", "ClientCommand__Drop");
-	UTIL_RegisterClientCommandAll("manage", "ClientCommand__Manage");
-	UTIL_RegisterClientCommandAll("configurar", "ClientCommand__Manage");
 	UTIL_RegisterClientCommandAll("guns", "ClientCommand__Weapons");
 	UTIL_RegisterClientCommandAll("armas", "ClientCommand__Weapons");
 
@@ -97,82 +95,6 @@ public plugin_end()
 /* ===========================================================================
 * 				[ Zone Events ]
 * ============================================================================ */
-
-loadSpawns()
-{
-	ArrayClear(g_aSpawns);
-
-	new szMap[64], szFileName[PLATFORM_MAX_PATH];
-	get_localinfo("amxx_datadir", szFileName, PLATFORM_MAX_PATH-1);
-	get_mapname(szMap, charsmax(szMap)); mb_strtolower(szMap);
-	add(szFileName, PLATFORM_MAX_PATH-1, fmt("/re_dm/%s.dat", szMap));
-
-	new JSON:jSpawnsFile = json_parse(szFileName, true, false);
-	if(jSpawnsFile != Invalid_JSON)
-	{
-		new JSON:jSchema = json_parse("{^"random_spawn^":false,^"spawns^":[{^"team^":0,^"origin^":^"^",^"angles^":^"^"}]}", false, false);
-
-		if(json_validate(jSchema, jSpawnsFile))
-		{
-			g_bAllowRandomSpawns = json_object_get_bool(jSpawnsFile, "random_spawn");
-
-			new JSON:jArraySpawns = json_object_get_value(jSpawnsFile, "spawns");
-			for(new i = 0, aSpawn[ArraySpawns_e], szBuffer[21], szParse[3][7],
-				JSON:jArrayValue, iCount = json_array_get_count(jArraySpawns); i < iCount; ++i)
-			{
-				jArrayValue = json_array_get_value(jArraySpawns, i);
-
-				aSpawn[SpawnTeam] = TeamName:json_object_get_number(jArrayValue, "team");
-
-				json_object_get_string(jArrayValue, "origin", szBuffer, charsmax(szBuffer));
-				parse(szBuffer, szParse[0], charsmax(szParse[]), szParse[1], charsmax(szParse[]), szParse[2], charsmax(szParse[]));
-
-				aSpawn[SpawnOrigin][0] = str_to_float(szParse[0]);
-				aSpawn[SpawnOrigin][1] = str_to_float(szParse[1]);
-				aSpawn[SpawnOrigin][2] = str_to_float(szParse[2]);
-
-				json_object_get_string(jArrayValue, "angles", szBuffer, charsmax(szBuffer));
-				parse(szBuffer, szParse[0], charsmax(szParse[]), szParse[1], charsmax(szParse[]), szParse[2], charsmax(szParse[]));
-
-				aSpawn[SpawnAngles][0] = str_to_float(szParse[0]);
-				aSpawn[SpawnAngles][1] = str_to_float(szParse[1]);
-				aSpawn[SpawnAngles][2] = str_to_float(szParse[2]);
-
-				ArrayPushArray(g_aSpawns, aSpawn);
-
-				json_free(jArrayValue);
-			}
-
-			json_free(jArraySpawns);
-		}
-
-		json_free(jSchema);
-		json_free(jSpawnsFile);
-	}
-
-	if(ArraySize(g_aSpawns) < 1)
-	{
-		new const SPAWN_NAME_ENTS[][] = { "info_player_start", "info_player_deathmatch" };
-
-		for(new i = 0, iEnt, aSpawn[ArraySpawns_e]; i < sizeof(SPAWN_NAME_ENTS); ++i)
-		{
-			iEnt = MAX_CLIENTS;
-			while((iEnt = rg_find_ent_by_class(iEnt, SPAWN_NAME_ENTS[i])) > 0)
-			{
-				get_entvar(iEnt, var_origin, aSpawn[SpawnOrigin]);
-				get_entvar(iEnt, var_angles, aSpawn[SpawnAngles]);
-
-				aSpawn[SpawnTeam] = (!i) ? TEAM_CT : TEAM_TERRORIST;
-
-				ArrayPushArray(g_aSpawns, aSpawn);
-			}
-		}
-	}
-
-	new iCount = ArraySize(g_aSpawns);
-	server_print("[ReDM] %L", LANG_SERVER, "SERVER_INFO_SPAWNS_LOADED", iCount);
-	return iCount;
-}
 
 public client_putinserver(id)
 {
@@ -600,116 +522,6 @@ GiveWeapons(const id, const bWeaponType)
 	}
 }
 
-ShowMenu_Management(const id)
-{
-	new iSpawnsCount = ArraySize(g_aSpawns);
-	new iCt = 0, iT = 0;
-
-	for(new i = 0, aSpawn[ArraySpawns_e]; i < iSpawnsCount; i++)
-	{
-		ArrayGetArray(g_aSpawns, i, aSpawn);
-
-		if(aSpawn[SpawnTeam] == TEAM_CT)
-			++iCt;
-		else if(aSpawn[SpawnTeam] == TEAM_TERRORIST)
-			++iT;
-	}
-
-	new iMenuId = menu_create(fmt("\y%s : %L^n\dCT: [ %d ] | T: [ %d ] | Total: [ %d ]", 
-		PLUGIN_NAME, LANG_PLAYER, "MENU_TITLE_MANAGEMENT", iCt, iT, iSpawnsCount), "menu_Management");
-
-	menu_additem(iMenuId, fmt("%L %L^n", LANG_PLAYER, "MENU_SPAWN_TYPE", id, g_bAllowRandomSpawns ? "MENU_SPAWN_TYPE_RANDOM" : "MENU_SPAWN_TYPE_TEAM"));
-	
-	menu_additem(iMenuId, fmt("%L", LANG_PLAYER, "MENU_SPAWN_CREATE_CT"));
-	menu_additem(iMenuId, fmt("%L^n", LANG_PLAYER, "MENU_SPAWN_CREATE_TT"));
-
-	menu_additem(iMenuId, fmt("%L^n", LANG_PLAYER, "MENU_SPAWN_SWITCH"));
-	
-	menu_additem(iMenuId, fmt("%L", LANG_PLAYER, "MENU_SPAWN_DELETE_AIM"));
-	menu_additem(iMenuId, fmt("%L^n", LANG_PLAYER, "MENU_SPAWN_DELETE_ALL"));
-	
-	menu_additem(iMenuId, fmt("%L^n", LANG_PLAYER, "MENU_SPAWN_SAVE_ALL"));
-	
-	menu_additem(iMenuId, fmt("%L", LANG_PLAYER, "MENU_OPT_EXIT"));
-	
-	menu_setprop(iMenuId, MPROP_EXIT, MEXIT_NEVER);
-	menu_setprop(iMenuId, MPROP_PERPAGE, 0);
-	
-	menu_display(id, iMenuId);
-}
-
-public menu_Management(const id, const menuid, const itemid)
-{
-	menu_destroy(menuid);
-
-	if(!IsConnected(id) || itemid == MENU_EXIT || itemid > 6)
-	{
-		HideCustomSpawns();
-		return PLUGIN_HANDLED;
-	}
-
-	switch(itemid)
-	{
-		case 0:
-		{
-			#emit LOAD.pri g_bAllowRandomSpawns
-			#emit NOT
-			#emit STOR.pri g_bAllowRandomSpawns
-		}
-		case 1, 2:
-		{
-			new aSpawn[ArraySpawns_e];
-
-			get_entvar(id, var_origin, aSpawn[SpawnOrigin]);
-			get_entvar(id, var_v_angle, aSpawn[SpawnAngles]);
-
-			aSpawn[SpawnTeam] = (itemid == 1) ? TEAM_CT : TEAM_TERRORIST;
-
-			ArrayPushArray(g_aSpawns, aSpawn);
-		}
-		case 3:
-		{
-			new iEnt = FindCustomSpawn(id);
-			
-			if(iEnt > 0)
-			{
-				new iItem = get_entvar(iEnt, var_iuser1);
-
-				new aSpawn[ArraySpawns_e];
-				ArrayGetArray(g_aSpawns, iItem, aSpawn);
-
-				(aSpawn[SpawnTeam] == TEAM_TERRORIST)
-					? (aSpawn[SpawnTeam] = TEAM_CT)
-					: (aSpawn[SpawnTeam] = TEAM_TERRORIST);
-
-				ArraySetArray(g_aSpawns, iItem, aSpawn);
-			}
-		}
-		case 4:
-		{
-			new iEnt = FindCustomSpawn(id);
-			
-			if(iEnt > 0)
-			{
-				new iItem = get_entvar(iEnt, var_iuser1);
-				
-				set_entvar(iEnt, var_modelindex, 0);
-				set_entvar(iEnt, var_flags, FL_KILLME);
-				
-				ArrayDeleteItem(g_aSpawns, iItem);
-			}
-		}
-		case 5: ArrayClear(g_aSpawns);
-		case 6: SaveMapData(id);
-	}
-	
-	HideCustomSpawns();
-	ShowCustomSpawns();
-	
-	ShowMenu_Management(id);
-	return PLUGIN_HANDLED;
-}
-
 /* ===========================================================================
 * 				[ Client Commands ]
 * ============================================================================ */
@@ -717,17 +529,6 @@ public menu_Management(const id, const menuid, const itemid)
 public ClientCommand__Drop(const id)
 {
 	return g_iCSDM_BlockDrop ? PLUGIN_HANDLED : PLUGIN_CONTINUE;
-}
-
-public ClientCommand__Manage(const id)
-{
-	if(!IsConnected(id) || ~get_user_flags(id) & ADMIN_IMMUNITY)
-		return PLUGIN_HANDLED;
-
-	ShowCustomSpawns();
-	
-	ShowMenu_Management(id);
-	return PLUGIN_HANDLED;
 }
 
 public ClientCommand__Weapons(const id)
@@ -750,170 +551,6 @@ public ClientCommand__Weapons(const id)
 	client_print_color(id, print_team_default, "%s %L", g_szGlobalPrefix, LANG_PLAYER, "CHAT_INFO_NEXT_REGEN");
 
 	return PLUGIN_HANDLED;
-}
-
-/* =================================================================================
-* 				[ Show Spawns While Editing ]
-* ================================================================================= */
-
-CreateCustomSpawn(const i, const TeamName:iTeam, const Float:vecOrigin[3], const Float:vecAngles[3])
-{
-	new iEnt = rg_create_entity(g_szInfoTargetClass);
-	
-	if(!is_valid_ent(iEnt))
-		return 0;
-	
-	set_entvar(iEnt, var_classname, g_szCustomSpawnClass);
-	
-	entity_set_model(iEnt, g_szCustomSpawnModels[_:iTeam]);
-	entity_set_size(iEnt, Float:{-16.0, -16.0, -36.0}, Float:{16.0, 16.0, 36.0});
-	
-	entity_set_origin(iEnt, vecOrigin);
-	set_entvar(iEnt, var_angles, vecAngles);
-	
-	set_entvar(iEnt, var_solid, SOLID_TRIGGER);
-	set_entvar(iEnt, var_movetype, MOVETYPE_FLY);
-	
-	set_entvar(iEnt, var_sequence, 1);
-	set_entvar(iEnt, var_weaponanim, 1);
-	
-	set_entvar(iEnt, var_animtime, get_gametime());
-	set_entvar(iEnt, var_framerate, 1.0);
-	set_entvar(iEnt, var_frame, 0.0);
-	
-	set_entvar(iEnt, var_controller, 125, 0);
-	set_entvar(iEnt, var_controller, 125, 1);
-	set_entvar(iEnt, var_controller, 125, 2);
-	set_entvar(iEnt, var_controller, 125, 3);
-
-	set_entvar(iEnt, var_iuser1, i);
-	
-	return iEnt;
-}
-
-FindCustomSpawn(const id)
-{
-	new Float:vecOrigin[3];
-	new Float:vecEnd[3];
-	new Float:vecStart[3];
-	new Float:vecViewOfs[3];
-	new Float:vecAngles[3];
-
-	get_entvar(id, var_origin, vecOrigin);
-	get_entvar(id, var_view_ofs, vecViewOfs);
-	get_entvar(id, var_v_angle, vecAngles);
-
-	xs_vec_add(vecOrigin, vecViewOfs, vecStart);
-
-	angle_vector(vecAngles, ANGLEVECTOR_FORWARD, vecAngles);
-
-	xs_vec_mul_scalar(vecAngles, 2048.0, vecAngles);
-	xs_vec_add(vecStart, vecAngles, vecEnd);
-
-	new iEnt = 0;
-	while((iEnt = rg_find_ent_by_class(iEnt, g_szCustomSpawnClass)) > 0)
-	{
-		engfunc(EngFunc_TraceModel, vecStart, vecEnd, HULL_POINT, iEnt, 0);
-		
-		if(get_tr2(0, TR_pHit) == iEnt)
-			return iEnt;
-	}
-
-	return 0;
-}
-
-ShowCustomSpawns()
-{
-	if(g_bShowingSpawns)
-		return;
-	
-	g_bShowingSpawns = true;
-
-	for(new i = 0, Float:vecOrigin[3], Float:vecAngles[3],
-		aSpawn[ArraySpawns_e], iSpawnsCount = ArraySize(g_aSpawns); i < iSpawnsCount; i++)
-	{
-		ArrayGetArray(g_aSpawns, i, aSpawn);
-		
-		xs_vec_copy(aSpawn[SpawnOrigin], vecOrigin);
-		vecOrigin[2] += 10.0; // Prevent stuck spawn
-		vecAngles[1] = aSpawn[SpawnAngles][1];
-		
-		CreateCustomSpawn(i, aSpawn[SpawnTeam], vecOrigin, vecAngles);
-	}
-}
-
-HideCustomSpawns()
-{
-	if(!g_bShowingSpawns)
-		return;
-	
-	g_bShowingSpawns = false;
-	
-	new iEnt = 0;
-	while((iEnt = rg_find_ent_by_class(iEnt, g_szCustomSpawnClass)) > 0)
-	{
-		set_entvar(iEnt, var_modelindex, 0);
-		set_entvar(iEnt, var_flags, FL_KILLME);
-	}
-}
-
-SaveMapData(const id)
-{
-	new szDir[PLATFORM_MAX_PATH];
-	get_localinfo("amxx_datadir", szDir, PLATFORM_MAX_PATH-1);
-	add(szDir, PLATFORM_MAX_PATH-1, "/re_dm");
-
-	if(!dir_exists(szDir))
-		mkdir(szDir);
-
-	new szMap[64], szFileName[PLATFORM_MAX_PATH];
-	get_mapname(szMap, charsmax(szMap)); mb_strtolower(szMap);
-	formatex(szFileName, PLATFORM_MAX_PATH-1, "%s/%s.dat", szDir, szMap);
-
-	new JSON:jRootValue = json_init_object();
-
-	json_object_set_bool(jRootValue, "random_spawn", g_bAllowRandomSpawns);
-
-	new JSON:jArray = json_init_array();
-	new JSON:jObjectSpawn;
-	new Array:aObjectTemp = ArrayCreate(1, 1); // Save all json objects ids
-
-	for(new i = 0, aSpawn[ArraySpawns_e], iCount = ArraySize(g_aSpawns); i < iCount; ++i)
-	{
-		ArrayGetArray(g_aSpawns, i, aSpawn);
-
-		jObjectSpawn = json_init_object();
-		ArrayPushCell(aObjectTemp, JSON:jObjectSpawn); // Push json object id
-
-		json_object_set_number(jObjectSpawn, "id", i+1);
-		json_object_set_number(jObjectSpawn, "team", _:aSpawn[SpawnTeam]);
-
-		json_object_set_string(jObjectSpawn, "origin", 
-			fmt("%d %d %d", floatround(aSpawn[SpawnOrigin][0]), floatround(aSpawn[SpawnOrigin][1]), floatround(aSpawn[SpawnOrigin][2])));
-
-		json_object_set_string(jObjectSpawn, "angles", 
-			fmt("%d %d %d", floatround(aSpawn[SpawnAngles][0]), floatround(aSpawn[SpawnAngles][1]), floatround(aSpawn[SpawnAngles][2])));
-
-		json_array_append_value(jArray, jObjectSpawn);
-	}
-
-	json_object_set_value(jRootValue, "spawns", jArray);
-	
-	if(json_serial_to_file(jRootValue, szFileName, true))
-		client_print_color(id, print_team_default, "%s %L", g_szGlobalPrefix, LANG_PLAYER, "CHAT_SAVED_OK", szFileName);
-	else
-		client_print_color(id, print_team_default, "%s %L", g_szGlobalPrefix, LANG_PLAYER, "CHAT_SAVED_ERROR", szFileName);
-
-	// Free all objects
-	for(new i = 0, iCount = ArraySize(aObjectTemp); i < iCount; ++i)
-	{
-		jObjectSpawn = JSON:ArrayGetCell(aObjectTemp, i);
-		json_free(jObjectSpawn); // Free json object id
-	}
-
-	ArrayDestroy(aObjectTemp);
-	json_free(jArray);
-	json_free(jRootValue);
 }
 
 /* ===========================================================================
@@ -1146,4 +783,29 @@ GetDropOrigin(const id, Float:vecOrigin[3], iVelAdd = 0)
 	
 	vecOrigin[0] += vecAim[0];
 	vecOrigin[1] += vecAim[1];
+}
+
+SpawnsInit()
+{
+	ArrayClear(g_aSpawns);
+
+	new const SPAWN_NAME_ENTS[][] = { "info_player_start", "info_player_deathmatch" };
+
+	for(new i = 0, iEnt, aSpawn[ArraySpawns_e]; i < sizeof(SPAWN_NAME_ENTS); ++i)
+	{
+		iEnt = MAX_CLIENTS;
+		while((iEnt = rg_find_ent_by_class(iEnt, SPAWN_NAME_ENTS[i])) > 0)
+		{
+			get_entvar(iEnt, var_origin, aSpawn[SpawnOrigin]);
+			get_entvar(iEnt, var_angles, aSpawn[SpawnAngles]);
+
+			aSpawn[SpawnTeam] = (!i) ? TEAM_CT : TEAM_TERRORIST;
+
+			ArrayPushArray(g_aSpawns, aSpawn);
+		}
+	}
+
+	new iCount = ArraySize(g_aSpawns);
+	server_print("[DM] %L", LANG_SERVER, "SERVER_INFO_SPAWNS_LOADED", iCount);
+	return iCount;
 }

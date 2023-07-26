@@ -5,7 +5,7 @@
 
 #define DM_VERSION_MAJOR                0
 #define DM_VERSION_MINOR                0
-#define DM_VERSION_PATCH                3
+#define DM_VERSION_PATCH                4
 
 #define PLUGIN_NAME                     "DeathMatch CS"
 #define PLUGIN_VERSION                  fmt("v%d.%d.%d", DM_VERSION_MAJOR, DM_VERSION_MINOR, DM_VERSION_PATCH)
@@ -122,19 +122,8 @@ new g_iBuyItem[MAX_USERS];
 new g_iWeaponData[MAX_USERS][WeaponData_e];
 
 /* ===========================================================================
-*                 [ SPAWNS EDITOR ]
+*                 [ SPAWNS ]
 * ============================================================================ */
-
-new const g_szInfoTargetClass[]         = "info_target";
-new const g_szCustomSpawnClass[]        = "CustomSpawn";
-
-new const g_szCustomSpawnModels[][] =
-{
-	"",
-	"models/player/terror/terror.mdl",
-	"models/player/gign/gign.mdl",
-	""
-};
 
 enum _:ArraySpawns_e
 {
@@ -146,4 +135,3 @@ enum _:ArraySpawns_e
 new Array:g_aSpawns;
 
 new bool:g_bAllowRandomSpawns = true;
-new bool:g_bShowingSpawns = false;
