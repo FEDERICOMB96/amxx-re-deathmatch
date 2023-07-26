@@ -41,6 +41,7 @@ public plugin_init()
 	SpawnsInit();
 	WeaponsInit();
 
+	bind_pcvar_num(create_cvar("csdm_allow_random_spawns", "1"), g_iCSDM_AllowRandomSpawns);
 	bind_pcvar_num(create_cvar("csdm_only_head", "0"), g_iCSDM_OnlyHead);
 	bind_pcvar_num(create_cvar("csdm_drop_medic", "0"), g_iCSDM_MedicKit);
 	bind_pcvar_num(create_cvar("csdm_refill_armor_on_kill", "1"), g_iCSDM_RefillArmorOnKill);
@@ -596,7 +597,7 @@ public randomSpawn(const id)
 
 		ArrayGetArray(g_aSpawns, iSpawnId, aSpawns);
 
-		if(!g_iCSDM_FreeForAll && !g_bAllowRandomSpawns && iTeam != aSpawns[SpawnTeam])
+		if(!g_iCSDM_FreeForAll && !g_iCSDM_AllowRandomSpawns && iTeam != aSpawns[SpawnTeam])
 			continue;
 
 		iFinal = iSpawnId;

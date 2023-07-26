@@ -13,6 +13,7 @@ Original plugin [CSDM](https://forums.alliedmods.net/showthread.php?t=79583) dev
 ## Cvars
 | Cvar                                | Default | Min | Max          | Description                                                                 |
 | :---------------------------------- | :-----: | :-: | :----------: | :-------------------------------------------------------------------------- |
+| csdm_allow_random_spawns            | 1       | 0   | 1            | Allow random spawns.                                                        | 
 | csdm_only_head                      | 0       | 0   | 1            | Play mode "only head".                                                      |
 | csdm_drop_medic                     | 0       | 0   | 1            | Drops a med kit by killing an enemy which grants extra life when picked up. |
 | csdm_refill_armor_on_kill           | 1       | 0   | 1            | Instantly refill player armor on kill.                                      |
@@ -26,5 +27,4 @@ Original plugin [CSDM](https://forums.alliedmods.net/showthread.php?t=79583) dev
 ## Say / Say_Team commands
 | Command                             | Description                                    |
 | :---------------------------------- | :--------------------------------------------- |
-| manage / configurar                 | Opens the current map spawn editor menu.       |
 | guns / armas                        | Opens the weapon selection menu.               |
