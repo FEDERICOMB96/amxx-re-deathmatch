@@ -26,6 +26,11 @@ UTIL_SetAnimation(const iId, const iAnimation)
 	message_end();
 }
 
+TeamName:UTIL_GetUserTeam(const iId)
+{
+	return TeamName:get_member(iId, m_iTeam);
+}
+
 WeaponIdType:UTIL_GetCurrentWeapon(const iId)
 {
 	new pActiveItem = get_member(iId, m_pActiveItem);

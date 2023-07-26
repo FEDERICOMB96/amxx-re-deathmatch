@@ -53,6 +53,7 @@ public plugin_init()
 	bind_pcvar_num(create_cvar("csdm_block_kill_command", "1"), g_iCSDM_BlockKillCommand);
 	bind_pcvar_num(create_cvar("csdm_block_spawn_sounds", "1"), g_iCSDM_BlockSpawnSounds);
 	bind_pcvar_num(create_cvar("csdm_block_drop", "0"), g_iCSDM_BlockDrop);
+	bind_pcvar_num(create_cvar("csdm_freeforall_team", "0"), g_iCSDM_FreeForAll_Team);
 	bind_pcvar_num(get_cvar_pointer("mp_freeforall"), g_iCSDM_FreeForAll);
 	bind_pcvar_float(get_cvar_pointer("mp_item_staytime"), g_flCSDM_ItemStaytime);
 
@@ -142,8 +143,11 @@ public OnCBasePlayer_Spawn_Post(const this)
 
 	g_iBuyItem[this] = 0;
 
-	if(g_iCSDM_FreeForAll && GetUserTeam(this) != TEAM_TERRORIST)
-		rg_set_user_team(this, TEAM_TERRORIST);
+	if(g_iCSDM_FreeForAll && (TEAM_TERRORIST <= TeamName:g_iCSDM_FreeForAll_Team <= TEAM_CT))
+	{
+		if(UTIL_GetUserTeam(this) != TeamName:g_iCSDM_FreeForAll_Team)
+			rg_set_user_team(this, TeamName:g_iCSDM_FreeForAll_Team);
+	}
 
 	randomSpawn(this);
 
@@ -567,7 +571,7 @@ public randomSpawn(const id)
 
 	new iHull = (get_entvar(id, var_flags) & FL_DUCKING) ? HULL_HEAD : HULL_HUMAN;
 	new iSpawnId = random_num(0, iArraySize - 1);
-	new TeamName:iTeam = GetUserTeam(id);
+	new TeamName:iTeam = UTIL_GetUserTeam(id);
 	new iCount = 0;
 	new iSpawnPass = 0;
 	new iFinal = -1;
@@ -580,7 +584,7 @@ public randomSpawn(const id)
 
 	for(i = 1; i <= MAX_CLIENTS; ++i)
 	{
-		if(!IsAlive(i) || i == id || (!g_iCSDM_FreeForAll && iTeam == GetUserTeam(i)))
+		if(!IsAlive(i) || i == id || (!g_iCSDM_FreeForAll && iTeam == UTIL_GetUserTeam(i)))
 			continue;
 
 		get_entvar(i, var_origin, vecOriginPlayer[iCount++]);
@@ -670,11 +674,6 @@ bool:IsUserStuck(const id)
 		return true;
 	
 	return false;
-}
-
-public TeamName:GetUserTeam(const id)
-{
-	return TeamName:get_member(id, m_iTeam);
 }
 
 SpawnsInit()

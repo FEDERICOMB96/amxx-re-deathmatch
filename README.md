@@ -16,7 +16,7 @@ Original plugin [CSDM](https://forums.alliedmods.net/showthread.php?t=79583) dev
 | csdm_allow_random_spawns            | 1       | 0   | 1            | Allow random spawns.                                                        | 
 | csdm_only_head                      | 0       | 0   | 1            | Play mode "only head".                                                      |
 | csdm_drop_medic                     | 0       | 0   | 1            | Drops a med kit by killing an enemy which grants extra life when picked up. |
-| csdm_medic_health				      | 50      | 1   | 100          | Health of the med kit (Use in conjunction with the cvar 'csdm_drop_medic'). |
+| csdm_medic_health                   | 50      | 1   | 100          | Health of the med kit (Use in conjunction with the cvar 'csdm_drop_medic'). |
 | csdm_refill_armor_on_kill           | 1       | 0   | 1            | Instantly refill player armor on kill.                                      |
 | csdm_kill_ding_sound                | 1       | 0   | 1            | Play a ding sound on kill.                                                  |
 | csdm_screenfade_on_kill             | 1       | 0   | 1            | Screenfade effect on kill.                                                  |
@@ -24,6 +24,7 @@ Original plugin [CSDM](https://forums.alliedmods.net/showthread.php?t=79583) dev
 | csdm_block_kill_command             | 1       | 0   | 1            | Block kill console command.                                                 |
 | csdm_block_spawn_sounds             | 1       | 0   | 1            | Block spawn sounds.                                                         |
 | csdm_block_drop                     | 0       | 0   | 1            | Block drop of weapons.                                                      |
+| csdm_freeforall_team                | 0       | 0   | 2            | Free for all team (Use in conjunction with the cvar 'mp_freeforall').<br/>`0` any team<br/>`1` only `T`<br/>`2` only `CT` |
 
 ## Say / Say_Team commands
 | Command                             | Description                                    |
