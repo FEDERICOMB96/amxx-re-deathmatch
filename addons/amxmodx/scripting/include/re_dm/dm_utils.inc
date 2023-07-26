@@ -68,3 +68,18 @@ bool:UTIL_GetWeaponSilen(const pWeapon)
 
 	return false;
 }
+
+UTIL_GetDropOrigin(const iId, Float:vecOrigin[3], iVelAdd = 0)
+{
+	new Float:vecAim[3];
+	new Float:vecViewOfs[3];
+	
+	get_entvar(iId, var_view_ofs, vecViewOfs);
+	get_entvar(iId, var_origin, vecOrigin);
+	xs_vec_add(vecOrigin, vecViewOfs, vecOrigin);
+	
+	velocity_by_aim(iId, 50 + iVelAdd, vecAim);
+	
+	vecOrigin[0] += vecAim[0];
+	vecOrigin[1] += vecAim[1];
+}

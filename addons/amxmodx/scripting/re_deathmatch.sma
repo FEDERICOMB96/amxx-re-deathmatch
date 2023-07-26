@@ -9,6 +9,7 @@
 #include "re_dm/dm_global"
 #include "re_dm/dm_utils"
 #include "re_dm/dm_weapons"
+#include "re_dm/dm_med_kit"
 
 /* =================================================================================
 * 				[ Plugin events ]
@@ -44,6 +45,7 @@ public plugin_init()
 	bind_pcvar_num(create_cvar("csdm_allow_random_spawns", "1"), g_iCSDM_AllowRandomSpawns);
 	bind_pcvar_num(create_cvar("csdm_only_head", "0"), g_iCSDM_OnlyHead);
 	bind_pcvar_num(create_cvar("csdm_drop_medic", "0"), g_iCSDM_MedicKit);
+	bind_pcvar_num(create_cvar("csdm_medic_health", "50"), g_iCSDM_MedicKitHealth);
 	bind_pcvar_num(create_cvar("csdm_refill_armor_on_kill", "1"), g_iCSDM_RefillArmorOnKill);
 	bind_pcvar_num(create_cvar("csdm_kill_ding_sound", "1"), g_iCSDM_KillDingSound);
 	bind_pcvar_num(create_cvar("csdm_screenfade_on_kill", "1"), g_iCSDM_ScreenFadeOnKill);
@@ -208,18 +210,7 @@ public OnCBasePlayer_Killed_Post(const this, pevAttacker, iGib)
 
 	if(g_iCSDM_MedicKit)
 	{
-		new Float:vecOrigin[3];
-		new Float:vecEndOrigin[3];
-		new Float:flFraction;
-		
-		get_entvar(this, var_origin, vecOrigin);
-		GetDropOrigin(this, vecEndOrigin, 20);
-		
-		engfunc(EngFunc_TraceLine, vecOrigin, vecEndOrigin, IGNORE_MONSTERS, this, 0);
-		
-		get_tr2(0, TR_flFraction, flFraction);
-		
-		if(flFraction == 1.0)
+		if(CanDropMedKit(this))
 			DropMedKit(this);
 	}
 
@@ -684,116 +675,6 @@ bool:IsUserStuck(const id)
 public TeamName:GetUserTeam(const id)
 {
 	return TeamName:get_member(id, m_iTeam);
-}
-
-DropMedKit(const id)
-{
-	new iEnt = rg_create_entity("info_target");
-	
-	if(!is_nullent(iEnt))
-	{
-		new Float:vecVelocity[3];
-		new Float:vecOrigin[3];
-		
-		set_entvar(iEnt, var_classname, g_szMedKitClass);
-		entity_set_model(iEnt, g_szModel_MedicKit);
-		entity_set_size(iEnt, Float:{-23.16, -13.66, 0.0}, Float:{11.47, 12.78, 6.72});
-		
-		set_entvar(iEnt, var_solid, SOLID_TRIGGER);
-		set_entvar(iEnt, var_movetype, MOVETYPE_TOSS);
-		set_entvar(iEnt, var_rendermode, kRenderNormal);
-		set_entvar(iEnt, var_renderfx, kRenderFxNone);
-		
-		velocity_by_aim(id, 300, vecVelocity);
-		GetDropOrigin(id, vecOrigin);
-		set_entvar(iEnt, var_origin, vecOrigin);
-		set_entvar(iEnt, var_velocity, vecVelocity);
-		
-		set_entvar(iEnt, var_renderamt, 255.0);
-		set_entvar(iEnt, var_takedamage, DAMAGE_NO);
-
-		SetTouch(iEnt, "OnTouch_MedicKit");
-		SetThink(iEnt, "OnThink_MedicKit");
-
-		set_entvar(iEnt, var_nextthink, get_gametime() + g_flCSDM_ItemStaytime);
-	}
-}
-
-public OnTouch_MedicKit(const medickit, const id)
-{
-	if(is_nullent(medickit) || !IsAlive(id))
-		return;
-
-	new Float:flHealth = Float:get_entvar(id, var_health);
-
-	if(flHealth < 100.0)
-	{
-		set_entvar(id, var_health, floatmin((flHealth + 15.0), 100.0));
-		
-		client_cmd(id, "spk ^"%s^"", g_szSound_MedicKit);
-		
-		SetTouch(medickit, "");
-		SetThink(medickit, "");
-
-		set_entvar(medickit, var_modelindex, 0);
-		set_entvar(medickit, var_solid, SOLID_NOT);
-		set_entvar(medickit, var_flags, FL_KILLME);
-	}
-}
-
-public OnThink_MedicKit(const medickit)
-{
-	if(is_nullent(medickit))
-		return;
-
-	static Float:flRenderAmt;
-	flRenderAmt = Float:get_entvar(medickit, var_renderamt);
-	
-	if(flRenderAmt == 255.0)
-	{
-		set_entvar(medickit, var_solid, SOLID_NOT);
-		set_entvar(medickit, var_movetype, MOVETYPE_FLY);
-		set_entvar(medickit, var_rendermode, kRenderTransAlpha);
-		
-		set_entvar(medickit, var_velocity, Float:{0.0, 0.0, 20.0});
-		set_entvar(medickit, var_avelocity, Float:{0.0, 120.0, 0.0});
-		
-		set_entvar(medickit, var_renderamt, flRenderAmt - 15.0);
-		set_entvar(medickit, var_nextthink, get_gametime() + 0.01);
-		
-		return;
-	}
-	
-	flRenderAmt -= 15.0;
-	
-	if(flRenderAmt < 0.0)
-	{
-		SetTouch(medickit, "");
-		SetThink(medickit, "");
-
-		set_entvar(medickit, var_modelindex, 0);
-		set_entvar(medickit, var_solid, SOLID_NOT);
-		set_entvar(medickit, var_flags, FL_KILLME);
-		return;
-	}
-	
-	set_entvar(medickit, var_renderamt, flRenderAmt);
-	set_entvar(medickit, var_nextthink, get_gametime() + 0.1);
-}
-
-GetDropOrigin(const id, Float:vecOrigin[3], iVelAdd = 0)
-{
-	new Float:vecAim[3];
-	new Float:vecViewOfs[3];
-	
-	get_entvar(id, var_view_ofs, vecViewOfs);
-	get_entvar(id, var_origin, vecOrigin);
-	xs_vec_add(vecOrigin, vecViewOfs, vecOrigin);
-	
-	velocity_by_aim(id, 50 + iVelAdd, vecAim);
-	
-	vecOrigin[0] += vecAim[0];
-	vecOrigin[1] += vecAim[1];
 }
 
 SpawnsInit()

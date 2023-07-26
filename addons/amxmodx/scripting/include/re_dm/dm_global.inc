@@ -5,7 +5,7 @@
 
 #define DM_VERSION_MAJOR                0
 #define DM_VERSION_MINOR                0
-#define DM_VERSION_PATCH                7
+#define DM_VERSION_PATCH                8
 
 #define PLUGIN_NAME                     "DeathMatch CS"
 #define PLUGIN_VERSION                  fmt("v%d.%d.%d", DM_VERSION_MAJOR, DM_VERSION_MINOR, DM_VERSION_PATCH)
@@ -78,6 +78,7 @@ new g_Forward_Spawn;
 new g_iCSDM_AllowRandomSpawns;
 new g_iCSDM_OnlyHead;
 new g_iCSDM_MedicKit;
+new g_iCSDM_MedicKitHealth;
 new g_iCSDM_RefillArmorOnKill;
 new g_iCSDM_KillDingSound;
 new g_iCSDM_ScreenFadeOnKill;
