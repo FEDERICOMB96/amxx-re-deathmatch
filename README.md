@@ -25,6 +25,7 @@ Original plugin [CSDM](https://forums.alliedmods.net/showthread.php?t=79583) dev
 | csdm_block_spawn_sounds             | 1       | 0   | 1            | Block spawn sounds.                                                         |
 | csdm_block_drop                     | 0       | 0   | 1            | Block drop of weapons.                                                      |
 | csdm_freeforall_team                | 0       | 0   | 2            | Free for all team (Use in conjunction with the cvar 'mp_freeforall').<br/>`0` any team<br/>`1` only `T`<br/>`2` only `CT` |
+| csdm_block_fire_in_the_hole_radio   | 1       | 0   | 1            | Block "Fire in the hole" radio.                                             |
 
 ## Say / Say_Team commands
 | Command                             | Description                                    |

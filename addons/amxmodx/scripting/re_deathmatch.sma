@@ -51,6 +51,7 @@ public plugin_init()
 	bind_pcvar_num(create_cvar("csdm_block_kill_command", "1"), g_iCSDM_BlockKillCommand);
 	bind_pcvar_num(create_cvar("csdm_block_spawn_sounds", "1"), g_iCSDM_BlockSpawnSounds);
 	bind_pcvar_num(create_cvar("csdm_block_drop", "0"), g_iCSDM_BlockDrop);
+	bind_pcvar_num(create_cvar("csdm_block_fire_in_the_hole_radio", "1"), g_iCSDM_BlockFireInTheHoleRadio);
 	bind_pcvar_num(create_cvar("csdm_freeforall_team", "0"), g_iCSDM_FreeForAll_Team);
 	bind_pcvar_num(get_cvar_pointer("mp_freeforall"), g_iCSDM_FreeForAll);
 	bind_pcvar_float(get_cvar_pointer("mp_item_staytime"), g_flCSDM_ItemStaytime);
@@ -266,20 +267,23 @@ public message__TextMsg(const msgId, const destId, const id)
 			return PLUGIN_HANDLED;
 	}
 
-	// #Fire_in_the_hole
-	if(get_msg_args() == 5 && (get_msg_argtype(5) == ARG_STRING))
+	if(g_iCSDM_BlockFireInTheHoleRadio)
 	{
-		get_msg_arg_string(5, szMsg, 21);
+		// #Fire_in_the_hole
+		if(get_msg_args() == 5 && (get_msg_argtype(5) == ARG_STRING))
+		{
+			get_msg_arg_string(5, szMsg, charsmax(szMsg));
 
-		if(equal(szMsg, "#Fire_in_the_hole"))
-			return PLUGIN_HANDLED;
-	}
-	else if(get_msg_args() == 6 && (get_msg_argtype(6) == ARG_STRING))
-	{
-		get_msg_arg_string(6, szMsg, 21);
-		
-		if(equal(szMsg, "#Fire_in_the_hole"))
-			return PLUGIN_HANDLED;
+			if(equal(szMsg, "#Fire_in_the_hole"))
+				return PLUGIN_HANDLED;
+		}
+		else if(get_msg_args() == 6 && (get_msg_argtype(6) == ARG_STRING))
+		{
+			get_msg_arg_string(6, szMsg, charsmax(szMsg));
+			
+			if(equal(szMsg, "#Fire_in_the_hole"))
+				return PLUGIN_HANDLED;
+		}
 	}
 	
 	return PLUGIN_CONTINUE;
@@ -290,10 +294,13 @@ public message__SendAudio(const msgId, const destId, const id)
 	static szAudio[19];
 	get_msg_arg_string(2, szAudio, charsmax(szAudio));
 
-	for(new i = 0; i < sizeof(SENDAUDIO_BLOCK); ++i)
+	if(g_iCSDM_BlockFireInTheHoleRadio)
 	{
-		if(equal(szAudio, SENDAUDIO_BLOCK[i]))
-			return PLUGIN_HANDLED;
+		for(new i = 0; i < sizeof(SENDAUDIO_BLOCK); ++i)
+		{
+			if(equal(szAudio, SENDAUDIO_BLOCK[i]))
+				return PLUGIN_HANDLED;
+		}
 	}
 
 	return PLUGIN_CONTINUE;

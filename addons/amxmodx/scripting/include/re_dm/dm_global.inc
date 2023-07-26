@@ -5,7 +5,7 @@
 
 #define DM_VERSION_MAJOR                0
 #define DM_VERSION_MINOR                0
-#define DM_VERSION_PATCH                11
+#define DM_VERSION_PATCH                12
 
 #define PLUGIN_NAME                     "DeathMatch CS"
 #define PLUGIN_VERSION                  fmt("v%d.%d.%d", DM_VERSION_MAJOR, DM_VERSION_MINOR, DM_VERSION_PATCH)
@@ -76,6 +76,7 @@ new g_iCSDM_InstantReloadWeaponsOnKill;
 new g_iCSDM_BlockKillCommand;
 new g_iCSDM_BlockSpawnSounds;
 new g_iCSDM_BlockDrop;
+new g_iCSDM_BlockFireInTheHoleRadio;
 new g_iCSDM_FreeForAll_Team;
 new g_iCSDM_FreeForAll;
 new Float:g_flCSDM_ItemStaytime;
