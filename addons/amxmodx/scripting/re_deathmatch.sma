@@ -83,7 +83,11 @@ public plugin_init()
 
 public OnConfigsExecuted()
 {
-	server_cmd("exec dm_game.cfg");
+	new szFileName[PLATFORM_MAX_PATH];
+	new iLen = get_configsdir(szFileName, charsmax(szFileName));
+	formatex(szFileName[iLen], charsmax(szFileName) - iLen, "/%s/%s.cfg", DM_CONFIG_FOLDER, DM_CFG_FILENAME);
+
+	server_cmd("exec %s", szFileName);
 	server_cmd("sv_restart 1");
 }
 
