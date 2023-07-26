@@ -5,7 +5,7 @@
 
 #define DM_VERSION_MAJOR                0
 #define DM_VERSION_MINOR                0
-#define DM_VERSION_PATCH                5
+#define DM_VERSION_PATCH                6
 
 #define PLUGIN_NAME                     "DeathMatch CS"
 #define PLUGIN_VERSION                  fmt("v%d.%d.%d", DM_VERSION_MAJOR, DM_VERSION_MINOR, DM_VERSION_PATCH)

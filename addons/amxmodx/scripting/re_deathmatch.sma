@@ -59,6 +59,7 @@ public plugin_init()
 	RegisterHookChain(RG_CBasePlayer_TraceAttack, "OnCBasePlayer_TraceAttack", 0);
 	RegisterHookChain(RG_CBasePlayer_Killed, "OnCBasePlayer_Killed", 0);
 	RegisterHookChain(RG_CBasePlayer_Killed, "OnCBasePlayer_Killed_Post", 1);
+	RegisterHookChain(RG_CBasePlayer_AddAccount, "OnCBasePlayer_AddAccount", 0);
 
 	unregister_forward(FM_Spawn, g_Forward_Spawn);
 
@@ -242,6 +243,11 @@ public OnCBasePlayer_Killed_Post(const this, pevAttacker, iGib)
 		if(g_iCSDM_InstantReloadWeaponsOnKill)
 			rg_instant_reload_weapons(pevAttacker);
 	}
+}
+
+public OnCBasePlayer_AddAccount(const iId, iAmount, RewardType:iType, bool:bTrackChange)
+{
+	return HC_SUPERCEDE;
 }
 
 public OnFw__Spawn(const entity)
