@@ -88,7 +88,7 @@ public OnConfigsExecuted()
 {
 	new szFileName[PLATFORM_MAX_PATH];
 	new iLen = get_configsdir(szFileName, charsmax(szFileName));
-	formatex(szFileName[iLen], charsmax(szFileName) - iLen, "/%s/%s.cfg", DM_CONFIG_FOLDER, DM_CFG_FILENAME);
+	formatex(szFileName[iLen], charsmax(szFileName) - iLen, "/%s/%s", DM_CONFIG_FOLDER, DM_CFG_FILENAME);
 
 	server_cmd("exec %s", szFileName);
 	server_cmd("sv_restart 1");
